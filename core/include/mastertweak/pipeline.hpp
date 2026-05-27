@@ -1,0 +1,52 @@
+#pragma once
+
+#include "mastertweak/advice.hpp"
+#include "mastertweak/analysis.hpp"
+#include "mastertweak/io.hpp"
+#include "mastertweak/preset.hpp"
+
+#include <functional>
+#include <optional>
+#include <string>
+
+namespace mt {
+
+struct RenderOptions {
+    int  outputBitDepth = 24;
+    bool outputFlac     = false;
+    bool bypassEq       = false;
+    bool bypassMbComp   = false;
+    bool bypassSaturator= false;
+    bool bypassWidth    = false;
+    bool bypassMixbusComp = false;
+    bool bypassLimiter  = false;
+    bool bypassDither   = false;
+};
+
+// Full mastering result for one file.
+struct MasterResult {
+    AnalysisSnapshot analysis;
+    AdviceSet        advice;
+    bool             ok      = false;
+    std::string      errMsg;
+};
+
+// Progress callback: fraction in [0, 1], description string.
+using ProgressCallback = std::function<void(float fraction, const std::string& stage)>;
+
+// Analyse + derive advice without rendering.
+MasterResult analyseOnly(const std::string& inputPath,
+                         const PresetData&  preset,
+                         std::string*       errOut = nullptr);
+
+// Full mastering render: load → analyse → derive → apply DSP chain → write.
+// adviceOverride: if provided, uses those values instead of deriving from analysis.
+MasterResult renderFile(const std::string&     inputPath,
+                        const std::string&     outputPath,
+                        const PresetData&      preset,
+                        const RenderOptions&   opts          = {},
+                        const AdviceSet*       adviceOverride = nullptr,
+                        const ProgressCallback& progress      = {},
+                        std::string*           errOut        = nullptr);
+
+} // namespace mt
