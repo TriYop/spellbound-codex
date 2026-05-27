@@ -3,11 +3,9 @@
 #include "mastertweak/analysis.hpp"
 
 #include <QWidget>
-#include <optional>
 
 QT_BEGIN_NAMESPACE
 class QLabel;
-class QGridLayout;
 class QToolButton;
 QT_END_NAMESPACE
 

@@ -80,7 +80,7 @@ void TransportWidget::setOriginalFile(const QString& path) {
 void TransportWidget::unload() {
     cleanup();
     loadedPath_.clear();
-    originalPath_.clear();
+    // originalPath_ is NOT cleared here; it is managed by setOriginalFile().
     useOriginal_   = false;
     playbackFrame_ = 0;
     fileLabel_->setText("(no output yet)");
@@ -119,10 +119,13 @@ void TransportWidget::play() {
 
     maDevice_ = new ma_device;
     if (ma_device_init(nullptr, &cfg, maDevice_) != MA_SUCCESS) {
-        // maDevice_ not initialized: pUserData not set, free ctx manually before cleanup.
+        // maDevice_ was not initialized: do NOT touch maDevice_ struct fields (UB).
+        // Free ctx manually and tear down decoder; skip ma_device_stop/uninit.
         delete ctx;
-        maDevice_->pUserData = nullptr;
-        cleanup(); return;
+        delete maDevice_; maDevice_ = nullptr;
+        ma_decoder_uninit(maDecoder_);
+        delete maDecoder_; maDecoder_ = nullptr;
+        return;
     }
     // From here maDevice_->pUserData == ctx; cleanup() owns deletion.
     if (ma_device_start(maDevice_) != MA_SUCCESS) {

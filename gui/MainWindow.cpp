@@ -202,8 +202,8 @@ void MainWindow::setInputFile(const QString& path) {
     inputLabel_->setText(path);
     analysisPanel_->clear();
     parameterPanel_->clear();
-    transport_->setOriginalFile(path);
     transport_->unload();
+    transport_->setOriginalFile(path);
     renderedPath_.clear();
     saveButton_->setEnabled(false);
     renderButton_->setEnabled(false);
@@ -228,6 +228,7 @@ void MainWindow::startAnalysis() {
     }
     statusLabel_->setText("Analysing…");
     renderButton_->setEnabled(false);
+    if (resetBtn_) resetBtn_->setEnabled(false);
     analysisWorker_->setup(inputPath_.toStdString(), *currentPreset_, seq);
     analysisWorker_->start();
 }
@@ -240,8 +241,6 @@ void MainWindow::onAnalysisFinished(bool ok, const QString& errorMsg,
         statusLabel_->setText(QString("Analysis failed: %1").arg(errorMsg));
         return;
     }
-    lastAnalysis_ = result.analysis;
-    lastAdvice_   = result.advice;
     analysisPanel_->setSnapshot(result.analysis);
     parameterPanel_->setAdvice(result.advice);
     resetBtn_->setEnabled(true);
@@ -301,8 +300,6 @@ void MainWindow::onRenderFinished(bool ok, const QString& errorMsg, mt::MasterRe
     statusLabel_->setText(QString("Rendered → %1").arg(renderedPath_));
     transport_->loadFile(renderedPath_);
 
-    lastAnalysis_ = result.analysis;
-    lastAdvice_   = result.advice;
     analysisPanel_->setSnapshot(result.analysis);
     parameterPanel_->setAdvice(result.advice);
 }

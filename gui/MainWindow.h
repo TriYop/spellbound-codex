@@ -101,8 +101,6 @@ private:
     QString                  inputPath_;
     QString                  renderedPath_;   // last successfully rendered output
     std::optional<mt::PresetData>      currentPreset_;
-    std::optional<mt::AnalysisSnapshot> lastAnalysis_;
-    std::optional<mt::AdviceSet>        lastAdvice_;
 
     // ── Widgets ───────────────────────────────────────────────────────────────
     QLabel*                 inputLabel_      = nullptr;
