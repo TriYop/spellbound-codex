@@ -10,6 +10,8 @@ qt_add_executable(MasterTweak
     AdvicePanel.cpp
     ParameterOverridePanel.h
     ParameterOverridePanel.cpp
+    ParameterPanel.h
+    ParameterPanel.cpp
     TransportWidget.h
     TransportWidget.cpp
 )
