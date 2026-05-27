@@ -342,6 +342,9 @@ std::string MainWindow::sanitizePresetName(const std::string& name) {
     auto end = out.find_last_not_of('_');
     if (end != std::string::npos) out = out.substr(0, end + 1);
     if (out.size() > 24) out.resize(24);
+    // Strip trailing underscores that truncation may have exposed.
+    auto end2 = out.find_last_not_of('_');
+    if (end2 != std::string::npos) out = out.substr(0, end2 + 1);
     return out.empty() ? "preset" : out;
 }
 
