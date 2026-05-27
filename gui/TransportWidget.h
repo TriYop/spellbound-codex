@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QWidget>
+#include <cstdint>
 #include <string>
 
 QT_BEGIN_NAMESPACE
@@ -23,6 +24,8 @@ public:
 
     // Load a rendered file for preview playback.
     void loadFile(const QString& path);
+    // Set the original (pre-mastering) file for A/B comparison.
+    void setOriginalFile(const QString& path);
     void unload();
 
 public slots:
@@ -31,19 +34,26 @@ public slots:
 
 private slots:
     void onPlayStop();
+    void onAbToggle();
 
 private:
     void cleanup();
+    void updateAbButton();
 
     static void dataCallback(ma_device* dev, void* out, const void* /*in*/, unsigned int frameCount);
 
     QPushButton* playBtn_  = nullptr;
+    QPushButton* abBtn_    = nullptr;
     QLabel*      fileLabel_ = nullptr;
 
     ma_device*   maDevice_  = nullptr;
     ma_decoder*  maDecoder_ = nullptr;
     bool         playing_   = false;
     std::string  loadedPath_;
+
+    QString      originalPath_;
+    bool         useOriginal_  = false;
+    uint64_t     playbackFrame_ = 0;
 };
 
 } // namespace gui
