@@ -9,7 +9,6 @@ QT_BEGIN_NAMESPACE
 class QCheckBox;
 class QDoubleSpinBox;
 class QGroupBox;
-class QPushButton;
 QT_END_NAMESPACE
 
 namespace gui {
@@ -41,9 +40,6 @@ public:
     // Reset spinboxes to default values and clear stored advice and tints.
     void clear();
 
-private slots:
-    void onResetClicked();
-
 private:
     void buildUi();
 
@@ -53,6 +49,9 @@ private:
 
     // Recompute dirty tint for a single spinbox.
     void updateTint(QDoubleSpinBox* sp, double cleanVal);
+
+    // Clear all spinbox tints (set stylesheet to "").
+    void clearAllTints();
 
     static constexpr int kNumBands = mt::AdviceSet::kNumBands;
 
@@ -75,7 +74,6 @@ private:
     QDoubleSpinBox* satDriveSpin_     = nullptr;
     QDoubleSpinBox* mixbusThreshSpin_ = nullptr;
     QDoubleSpinBox* mixbusMakeupSpin_ = nullptr;
-    QPushButton*    resetBtn_         = nullptr;
 
     QCheckBox* bypassEqChk_      = nullptr;
     QCheckBox* bypassMbChk_      = nullptr;

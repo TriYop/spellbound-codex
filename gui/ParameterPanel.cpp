@@ -2,12 +2,13 @@
 
 #include "mastertweak/analysis.hpp"
 
+#include <cmath>
+
 #include <QCheckBox>
 #include <QDoubleSpinBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QPushButton>
 #include <QVBoxLayout>
 
 namespace gui {
@@ -49,10 +50,9 @@ void ParameterPanel::buildUi() {
 
             const int captured_i = i;
             connect(sp, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                    this, [this, captured_i](double val) {
+                    this, [this, captured_i](double) {
                         updateTint(eqGainSpins_[captured_i],
                                    cleanValues_.eqGain[captured_i]);
-                        (void)val;
                     });
         }
         row->addStretch();
@@ -101,10 +101,6 @@ void ParameterPanel::buildUi() {
                     updateTint(mixbusMakeupSpin_, cleanValues_.mixbusMakeup);
                 });
 
-        resetBtn_ = new QPushButton("Reset to advice");
-        connect(resetBtn_, &QPushButton::clicked,
-                this, &ParameterPanel::onResetClicked);
-        row->addWidget(resetBtn_);
         row->addStretch();
         vbox->addLayout(row);
     }
@@ -166,6 +162,15 @@ void ParameterPanel::updateTint(QDoubleSpinBox* sp, double cleanVal) {
         sp->setStyleSheet("");
 }
 
+void ParameterPanel::clearAllTints() {
+    for (int i = 0; i < kNumBands; ++i)
+        eqGainSpins_[i]->setStyleSheet("");
+    limCeilingSpin_->setStyleSheet("");
+    satDriveSpin_->setStyleSheet("");
+    mixbusThreshSpin_->setStyleSheet("");
+    mixbusMakeupSpin_->setStyleSheet("");
+}
+
 void ParameterPanel::setAdvice(const mt::AdviceSet& advice) {
     autoAdvice_ = advice;
     hasAdvice_  = true;
@@ -180,30 +185,17 @@ void ParameterPanel::setAdvice(const mt::AdviceSet& advice) {
 
     // Populate spinboxes and clear all tints.
     applyToSpins(advice);
-    for (int i = 0; i < kNumBands; ++i)
-        eqGainSpins_[i]->setStyleSheet("");
-    limCeilingSpin_->setStyleSheet("");
-    satDriveSpin_->setStyleSheet("");
-    mixbusThreshSpin_->setStyleSheet("");
-    mixbusMakeupSpin_->setStyleSheet("");
+    clearAllTints();
 }
 
 void ParameterPanel::resetToAdvice() {
     if (!hasAdvice_) return;
     applyToSpins(autoAdvice_);
-    for (int i = 0; i < kNumBands; ++i)
-        eqGainSpins_[i]->setStyleSheet("");
-    limCeilingSpin_->setStyleSheet("");
-    satDriveSpin_->setStyleSheet("");
-    mixbusThreshSpin_->setStyleSheet("");
-    mixbusMakeupSpin_->setStyleSheet("");
-}
-
-void ParameterPanel::onResetClicked() {
-    resetToAdvice();
+    clearAllTints();
 }
 
 mt::AdviceSet ParameterPanel::getParameters() const {
+    // Precondition: setAdvice() must have been called; returns default-constructed advice otherwise.
     // Start from stored advice so mbComp/width arrays are preserved.
     mt::AdviceSet adv = autoAdvice_;
 
