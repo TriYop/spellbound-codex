@@ -4,6 +4,7 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QString>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 namespace gui {
@@ -15,13 +16,27 @@ AnalysisPanel::AnalysisPanel(QWidget* parent) : QWidget(parent) {
 void AnalysisPanel::buildUi() {
     auto* vbox = new QVBoxLayout(this);
     vbox->setContentsMargins(0, 0, 0, 0);
+    vbox->setSpacing(0);
 
-    auto* box = new QGroupBox("Analysis", this);
+    // Toggle button (always visible)
+    toggleBtn_ = new QToolButton(this);
+    toggleBtn_->setText("▶ Analysis");
+    toggleBtn_->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    toggleBtn_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    connect(toggleBtn_, &QToolButton::clicked, this, &AnalysisPanel::onToggle);
+    vbox->addWidget(toggleBtn_);
+
+    // Content widget (collapsed by default)
+    contentWidget_ = new QWidget(this);
+    auto* contentLayout = new QVBoxLayout(contentWidget_);
+    contentLayout->setContentsMargins(0, 0, 0, 0);
+
+    auto* box = new QGroupBox(contentWidget_);
     auto* grid = new QGridLayout(box);
     grid->setColumnMinimumWidth(0, 70);
 
     // Header row
-    grid->addWidget(new QLabel("<b>Band</b>"),   0, 0);
+    grid->addWidget(new QLabel("<b>Band</b>"),    0, 0);
     grid->addWidget(new QLabel("<b>Avg RMS</b>"), 0, 1);
     grid->addWidget(new QLabel("<b>Peak RMS</b>"),0, 2);
     grid->addWidget(new QLabel("<b>Corr</b>"),    0, 3);
@@ -44,7 +59,15 @@ void AnalysisPanel::buildUi() {
     overallLabel_ = new QLabel("—", box);
     grid->addWidget(overallLabel_, overallRow, 1, 1, 4);
 
-    vbox->addWidget(box);
+    contentLayout->addWidget(box);
+    contentWidget_->setVisible(false);
+    vbox->addWidget(contentWidget_);
+}
+
+void AnalysisPanel::onToggle() {
+    collapsed_ = !collapsed_;
+    contentWidget_->setVisible(!collapsed_);
+    toggleBtn_->setText(collapsed_ ? "▶ Analysis" : "▼ Analysis");
 }
 
 void AnalysisPanel::setSnapshot(const mt::AnalysisSnapshot& snap) {
