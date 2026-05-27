@@ -40,8 +40,6 @@ private:
     void cleanup();
     void updateAbButton();
 
-    static void dataCallback(ma_device* dev, void* out, const void* /*in*/, unsigned int frameCount);
-
     QPushButton* playBtn_  = nullptr;
     QPushButton* abBtn_    = nullptr;
     QLabel*      fileLabel_ = nullptr;

@@ -118,9 +118,14 @@ void TransportWidget::play() {
     cfg.pUserData         = ctx;
 
     maDevice_ = new ma_device;
-    if (ma_device_init(nullptr, &cfg, maDevice_) != MA_SUCCESS ||
-        ma_device_start(maDevice_) != MA_SUCCESS) {
+    if (ma_device_init(nullptr, &cfg, maDevice_) != MA_SUCCESS) {
+        // maDevice_ not initialized: pUserData not set, free ctx manually before cleanup.
         delete ctx;
+        maDevice_->pUserData = nullptr;
+        cleanup(); return;
+    }
+    // From here maDevice_->pUserData == ctx; cleanup() owns deletion.
+    if (ma_device_start(maDevice_) != MA_SUCCESS) {
         cleanup(); return;
     }
     playing_ = true;
@@ -129,10 +134,7 @@ void TransportWidget::play() {
 
 void TransportWidget::stop() {
     if (!playing_) return;
-    // Save the PlaybackCtx pointer before cleanup so we can free it.
-    PlaybackCtx* ctx = maDevice_ ? static_cast<PlaybackCtx*>(maDevice_->pUserData) : nullptr;
     cleanup();
-    delete ctx;
     // playbackFrame_ is intentionally preserved so next play() resumes here.
     playBtn_->setText("▶ Play");
 }
@@ -148,10 +150,8 @@ void TransportWidget::onAbToggle() {
 
     if (playing_) {
         // Stop current device, then restart from the same position with the other file.
-        PlaybackCtx* ctx = maDevice_ ? static_cast<PlaybackCtx*>(maDevice_->pUserData) : nullptr;
-        // Capture position before cleanup resets nothing (cleanup doesn't touch playbackFrame_).
+        // cleanup() owns PlaybackCtx deletion.
         cleanup();
-        delete ctx;
         playBtn_->setText("▶ Play"); // cleanup sets playing_=false; play() will re-set to Stop
         play();
     }
@@ -166,6 +166,8 @@ void TransportWidget::updateAbButton() {
 
 void TransportWidget::cleanup() {
     if (maDevice_) {
+        delete static_cast<PlaybackCtx*>(maDevice_->pUserData);
+        maDevice_->pUserData = nullptr;
         ma_device_stop(maDevice_);
         ma_device_uninit(maDevice_);
         delete maDevice_;
