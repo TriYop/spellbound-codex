@@ -1,7 +1,6 @@
 #include "MainWindow.h"
-#include "AdvicePanel.h"
 #include "AnalysisPanel.h"
-#include "ParameterOverridePanel.h"
+#include "ParameterPanel.h"
 #include "PresetSelector.h"
 #include "TransportWidget.h"
 
@@ -18,6 +17,7 @@
 #include <QScrollArea>
 #include <QVBoxLayout>
 
+#include <cctype>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -112,29 +112,31 @@ void MainWindow::buildUi() {
         auto* row  = new QHBoxLayout;
         auto* lbl  = new QLabel("Preset:", central);
         presetSelector_ = new PresetSelector(central);
+        resetBtn_ = new QPushButton("↺ Reset", central);
+        resetBtn_->setEnabled(false);
         connect(presetSelector_, &PresetSelector::presetChanged,
                 this, &MainWindow::onPresetChanged);
+        connect(resetBtn_, &QPushButton::clicked, this, [this] {
+            parameterPanel_->resetToAdvice();
+        });
         row->addWidget(lbl);
         row->addWidget(presetSelector_, 1);
+        row->addWidget(resetBtn_);
         vbox->addLayout(row);
     }
 
-    // ── Analysis + Advice panels + Override panel (scrollable) ───────────────
+    // ── Analysis panel + Parameter panel (scrollable) ────────────────────────
     {
         auto* scroll = new QScrollArea(central);
         scroll->setWidgetResizable(true);
         auto* inner  = new QWidget;
         auto* ivbox  = new QVBoxLayout(inner);
 
-        auto* topRow = new QHBoxLayout;
         analysisPanel_ = new AnalysisPanel(inner);
-        advicePanel_   = new AdvicePanel(inner);
-        topRow->addWidget(analysisPanel_);
-        topRow->addWidget(advicePanel_);
-        ivbox->addLayout(topRow);
+        ivbox->addWidget(analysisPanel_);
 
-        overridePanel_ = new ParameterOverridePanel(inner);
-        ivbox->addWidget(overridePanel_);
+        parameterPanel_ = new ParameterPanel(inner);
+        ivbox->addWidget(parameterPanel_);
         ivbox->addStretch();
 
         scroll->setWidget(inner);
@@ -199,12 +201,13 @@ void MainWindow::setInputFile(const QString& path) {
     inputPath_ = path;
     inputLabel_->setText(path);
     analysisPanel_->clear();
-    advicePanel_->clear();
-    overridePanel_->clear();
+    parameterPanel_->clear();
+    transport_->setOriginalFile(path);
     transport_->unload();
     renderedPath_.clear();
     saveButton_->setEnabled(false);
     renderButton_->setEnabled(false);
+    resetBtn_->setEnabled(false);
     startAnalysis();
 }
 
@@ -240,8 +243,8 @@ void MainWindow::onAnalysisFinished(bool ok, const QString& errorMsg,
     lastAnalysis_ = result.analysis;
     lastAdvice_   = result.advice;
     analysisPanel_->setSnapshot(result.analysis);
-    advicePanel_->setAdvice(result.advice);
-    overridePanel_->setAutoAdvice(result.advice);
+    parameterPanel_->setAdvice(result.advice);
+    resetBtn_->setEnabled(true);
     statusLabel_->setText("Analysis complete — ready to render");
     renderButton_->setEnabled(true);
 }
@@ -263,15 +266,13 @@ void MainWindow::onRenderClicked() {
         if (renderWorker_->isRunning()) renderWorker_->terminate();
     });
 
-    mt::RenderOptions opts = overridePanel_->getBypassOptions();
+    mt::RenderOptions opts = parameterPanel_->getBypassOptions();
     opts.outputBitDepth = bitDepthCombo_->currentData().toInt();
     opts.outputFlac     = useFlac;
 
-    auto advOverride = overridePanel_->getAdviceOverride();
-    const mt::AdviceSet* advPtr = advOverride ? &*advOverride :
-                                  (lastAdvice_  ? &*lastAdvice_ : nullptr);
+    mt::AdviceSet params = parameterPanel_->getParameters();
     renderWorker_->setup(inputPath_.toStdString(), renderedPath_.toStdString(),
-                         *currentPreset_, opts, advPtr);
+                         *currentPreset_, opts, &params);
     renderWorker_->start();
 }
 
@@ -303,8 +304,7 @@ void MainWindow::onRenderFinished(bool ok, const QString& errorMsg, mt::MasterRe
     lastAnalysis_ = result.analysis;
     lastAdvice_   = result.advice;
     analysisPanel_->setSnapshot(result.analysis);
-    advicePanel_->setAdvice(result.advice);
-    overridePanel_->setAutoAdvice(result.advice);
+    parameterPanel_->setAdvice(result.advice);
 }
 
 void MainWindow::onSaveAs() {
@@ -322,10 +322,34 @@ void MainWindow::onSaveAs() {
     }
 }
 
+// static
+std::string MainWindow::sanitizePresetName(const std::string& name) {
+    std::string s;
+    s.reserve(name.size());
+    for (char ch : name) {
+        const auto c = static_cast<unsigned char>(ch);
+        s += std::isalnum(c) ? static_cast<char>(std::tolower(c)) : '_';
+    }
+    std::string out;
+    bool prevUnder = false;
+    for (char c : s) {
+        if (c == '_') { if (!prevUnder) out += c; prevUnder = true; }
+        else          { out += c; prevUnder = false; }
+    }
+    auto start = out.find_first_not_of('_');
+    if (start == std::string::npos) return "preset";
+    out = out.substr(start);
+    auto end = out.find_last_not_of('_');
+    if (end != std::string::npos) out = out.substr(0, end + 1);
+    if (out.size() > 24) out.resize(24);
+    return out.empty() ? "preset" : out;
+}
+
 QString MainWindow::makeDefaultOutputPath(bool flac) const {
     if (inputPath_.isEmpty()) return {};
     fs::path p{inputPath_.toStdString()};
-    const std::string stem = p.stem().string() + "_master";
+    const std::string suffix = currentPreset_ ? sanitizePresetName(currentPreset_->name) : "master";
+    const std::string stem = p.stem().string() + "_" + suffix;
     return QString::fromStdString(
         (p.parent_path() / (stem + (flac ? ".flac" : ".wav"))).string());
 }

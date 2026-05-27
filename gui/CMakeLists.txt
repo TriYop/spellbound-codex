@@ -6,10 +6,6 @@ qt_add_executable(MasterTweak
     PresetSelector.cpp
     AnalysisPanel.h
     AnalysisPanel.cpp
-    AdvicePanel.h
-    AdvicePanel.cpp
-    ParameterOverridePanel.h
-    ParameterOverridePanel.cpp
     ParameterPanel.h
     ParameterPanel.cpp
     TransportWidget.h

@@ -20,8 +20,7 @@ QT_END_NAMESPACE
 
 namespace gui {
 class AnalysisPanel;
-class AdvicePanel;
-class ParameterOverridePanel;
+class ParameterPanel;
 class PresetSelector;
 class TransportWidget;
 }
@@ -96,6 +95,7 @@ private:
     void startAnalysis();
     void setInputFile(const QString& path);
     QString makeDefaultOutputPath(bool flac) const;
+    static std::string sanitizePresetName(const std::string& name);
 
     // ── State ─────────────────────────────────────────────────────────────────
     QString                  inputPath_;
@@ -108,11 +108,11 @@ private:
     QLabel*                 inputLabel_      = nullptr;
     PresetSelector*         presetSelector_  = nullptr;
     AnalysisPanel*          analysisPanel_   = nullptr;
-    AdvicePanel*            advicePanel_     = nullptr;
-    ParameterOverridePanel* overridePanel_   = nullptr;
+    ParameterPanel*         parameterPanel_  = nullptr;
     TransportWidget*        transport_       = nullptr;
     QPushButton*            renderButton_    = nullptr;
     QPushButton*            saveButton_      = nullptr;
+    QPushButton*            resetBtn_        = nullptr;
     QComboBox*              bitDepthCombo_   = nullptr;
     QCheckBox*              flacCheck_       = nullptr;
     QLabel*                 statusLabel_     = nullptr;
