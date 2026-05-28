@@ -2,6 +2,8 @@ qt_add_executable(MasterTweak
     main.cpp
     MainWindow.h
     MainWindow.cpp
+    ChainPanel.h
+    ChainPanel.cpp
     PresetSelector.h
     PresetSelector.cpp
     AnalysisPanel.h
