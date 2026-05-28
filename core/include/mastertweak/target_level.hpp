@@ -8,8 +8,8 @@ namespace mt {
 
 struct TargetLevelProfile {
     std::string name;
-    float lufs;         // integrated loudness target (LUFS)
-    float peakCeiling;  // true-peak ceiling (dBTP)
+    float lufs        = 0.f;  // integrated loudness target (LUFS)
+    float peakCeiling = 0.f;  // true-peak ceiling (dBTP)
 };
 
 extern const std::array<TargetLevelProfile, 8> kTargetLevelProfiles;
