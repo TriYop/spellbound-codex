@@ -118,11 +118,14 @@ MasterResult renderFile(const std::string&     inputPath,
         for (auto& ch : buf)
             for (int f = 0; f < nf; ++f)
                 ch[static_cast<size_t>(f)] *= gain;
-        // Override the advice ceiling with the target's true-peak ceiling.
-        result.advice.limiter.ceilingDb = opts.targetLevel->peakCeiling;
+        // Override ceiling and LUFS target in the returned advice (GUI display).
+        result.advice.limiter.ceilingDb        = opts.targetLevel->peakCeiling;
+        result.advice.limiter.targetLufsApprox = opts.targetLevel->lufs;
     }
 
     // ── Limiter ───────────────────────────────────────────────────────────────
+    // Note: when bypassLimiter=true the gain trim above still runs but the
+    // ceiling is not enforced; the caller opted out of the limiter explicitly.
     if (!opts.bypassLimiter) {
         report(0.80f, "Limiting");
         dsp::Limiter lim;

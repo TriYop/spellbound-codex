@@ -159,7 +159,8 @@ TEST_CASE("pipeline: Spotify target normalises output to ~-14 LUFS") {
     CHECK(measuredLufs > -16.f);
     CHECK(measuredLufs < -12.f);
 
-    // True-peak ceiling must not exceed -1 dBTP (≈ 0.891 linear).
+    // Sample-peak must not exceed -1 dBFS (≈ 0.891). The limiter uses sample-peak
+    // detection (not 4× oversampled true-peak) so this is the enforced constraint.
     float maxAbs = 0.f;
     for (const auto& ch : out->samples)
         for (auto s : ch)
