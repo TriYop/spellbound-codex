@@ -60,8 +60,9 @@ void VUMeterWidget::paintEvent(QPaintEvent*) {
     // y=0 = top = +3 VU; y=barH = bottom = -20 VU.
     // Formula: y = (kVuMax - vu) / (kVuMax - kVuMin) * barH
     const float range      = kVuMax - kVuMin;  // 23 VU
-    const int   redThresh  = static_cast<int>((kVuMax -  0.f) / range * barH);  // y at 0 VU
-    const int   ylwThresh  = static_cast<int>((kVuMax - -3.f) / range * barH);  // y at -3 VU
+    const float fbarH      = static_cast<float>(barH);
+    const int   redThresh  = static_cast<int>((kVuMax -  0.f) / range * fbarH);  // y at 0 VU
+    const int   ylwThresh  = static_cast<int>((kVuMax - -3.f) / range * fbarH);  // y at -3 VU
 
     auto drawBar = [&](int x, float rms, const char* label) {
         float vu    = vuFromRms(rms);
