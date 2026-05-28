@@ -5,11 +5,17 @@
 #include <miniaudio.h>
 
 #include <QHBoxLayout>
+#include <QFileInfo>
+#include <QFont>
 #include <QLabel>
 #include <QPushButton>
-#include <QFileInfo>
+#include <QSlider>
+#include <QTimer>
+#include <QVBoxLayout>
 
+#include <algorithm>
 #include <atomic>
+#include <climits>
 #include <cmath>
 #include <cstring>
 
@@ -54,6 +60,22 @@ static void dataCallback(ma_device* dev, void* out, const void* /*in*/, unsigned
         ctx->atomicRmsR->store(static_cast<float>(std::sqrt(sumR / static_cast<double>(framesRead))),
                                std::memory_order_relaxed);
     }
+}
+
+static QString formatTime(uint64_t frames, uint32_t sampleRate) {
+    if (sampleRate == 0) return "--:--";
+    const uint64_t totalSecs = frames / sampleRate;
+    const uint64_t h = totalSecs / 3600;
+    const uint64_t m = (totalSecs % 3600) / 60;
+    const uint64_t s = totalSecs % 60;
+    if (h > 0)
+        return QString("%1:%2:%3")
+            .arg(h)
+            .arg(m, 2, 10, QChar('0'))
+            .arg(s, 2, 10, QChar('0'));
+    return QString("%1:%2")
+        .arg(m, 2, 10, QChar('0'))
+        .arg(s, 2, 10, QChar('0'));
 }
 
 TransportWidget::TransportWidget(QWidget* parent) : QWidget(parent) {
