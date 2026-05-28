@@ -121,9 +121,12 @@ MasterResult renderFile(const std::string&     inputPath,
 
     // ── Post-multiband gain staging ──────────────────────────────────────────
     // Restore RMS to pre-chain reference so saturator and mixbus comp see
-    // the level their advice was calibrated for.
-    report(0.40f, "Gain staging (post-multiband)");
-    result.gainStages.postMbComp = gs.restoreRms(buf, nf, rmsDbBeforeChain);
+    // the level their advice was calibrated for. Skip when bypassed — nothing
+    // to compensate.
+    if (!opts.bypassMbComp) {
+        report(0.40f, "Gain staging (post-multiband)");
+        result.gainStages.postMbComp = gs.restoreRms(buf, nf, rmsDbBeforeChain);
+    }
 
     // ── Saturator ────────────────────────────────────────────────────────────
     if (!opts.bypassSaturator) {
@@ -152,11 +155,6 @@ MasterResult renderFile(const std::string&     inputPath,
         mbusComp.process(buf, nf);
     }
 
-    // ── Post-mixbus gain staging ─────────────────────────────────────────────
-    // Trim peaks > -3 dBFS so the limiter operates in its clean range.
-    report(0.73f, "Gain staging (post-mixbus)");
-    result.gainStages.postMixbus = gs.trimPeak(buf, nf, -3.f);
-
     // ── Target-level normalisation (EBU R128) ────────────────────────────────
     if (opts.targetLevel.has_value()) {
         report(0.75f, "Normalizing to target");
@@ -181,9 +179,15 @@ MasterResult renderFile(const std::string&     inputPath,
         result.advice.limiter.targetLufsApprox = opts.targetLevel->lufs;
     }
 
+    // ── Pre-limiter peak trim ────────────────────────────────────────────────
+    // Final safety: trim peaks > -3 dBFS so the limiter operates in its clean
+    // range regardless of what target-level normalisation may have added.
+    report(0.78f, "Gain staging (pre-limiter)");
+    result.gainStages.postMixbus = gs.trimPeak(buf, nf, -3.f);
+
     // ── Limiter ───────────────────────────────────────────────────────────────
-    // Note: when bypassLimiter=true the gain trim above still runs but the
-    // ceiling is not enforced; the caller opted out of the limiter explicitly.
+    // Note: when bypassLimiter=true the pre-limiter peak trim above still runs;
+    // the caller opted out of the brickwall ceiling only.
     if (!opts.bypassLimiter) {
         report(0.80f, "Limiting");
         dsp::Limiter lim;
