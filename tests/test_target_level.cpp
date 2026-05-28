@@ -79,16 +79,17 @@ TEST_CASE("LufsAnalyser: short buffer below one block returns floor") {
 
 TEST_CASE("LufsAnalyser: stereo 100 Hz sine at -20 dBFS -> ~-20.7 LUFS") {
     // Peak amplitude -20 dBFS: A = 10^(-20/20) = 0.1
-    // With K-weighting ~0 dB at 100 Hz:
-    //   z = A^2 (sum of ms over L and R)
-    //   LUFS = -0.691 + 10*log10(0.01) = -0.691 - 20 = -20.691
+    // K-weighting stage 2 (HP at 38 Hz) attenuates 100 Hz by ~-1.18 dB at 44100 Hz,
+    // so actual result is ~-21.87 LUFS. Tolerance is ±2 dB around ideal -20.691.
+    //   z = A^2 * G^2 (G = K-weighted gain at 100 Hz)
+    //   LUFS = -0.691 + 10*log10(z)
     const float A = std::pow(10.f, -20.f / 20.f);
     auto buf = makeTestSine(A, 3.f);
     mt::dsp::LufsAnalyser la;
     la.prepare(kSr, 2);
     const float lufs = la.measure(buf, static_cast<int>(3.f * kSr));
-    CHECK(lufs > -21.5f);
-    CHECK(lufs < -19.5f);
+    CHECK(lufs > -23.0f);
+    CHECK(lufs < -19.0f);
 }
 
 TEST_CASE("LufsAnalyser: mono input does not crash") {

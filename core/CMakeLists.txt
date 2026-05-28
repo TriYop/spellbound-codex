@@ -15,6 +15,7 @@ add_library(mastertweak_core STATIC
     src/dsp/stereo_width.cpp
     src/dsp/limiter.cpp
     src/dsp/dither.cpp
+    src/dsp/lufs_analyser.cpp
 )
 
 target_include_directories(mastertweak_core PUBLIC
