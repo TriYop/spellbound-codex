@@ -17,10 +17,10 @@ namespace gui {
 
 // Context passed to miniaudio's data callback so it can track playback position.
 struct PlaybackCtx {
-    ma_decoder*         decoder;
-    uint64_t*           framePos;  // pointer into TransportWidget::playbackFrame_
-    std::atomic<float>* atomicRmsL;
-    std::atomic<float>* atomicRmsR;
+    ma_decoder*              decoder;
+    std::atomic<uint64_t>*   framePos;  // pointer into TransportWidget::playbackFrame_
+    std::atomic<float>*      atomicRmsL;
+    std::atomic<float>*      atomicRmsR;
 };
 
 static void dataCallback(ma_device* dev, void* out, const void* /*in*/, unsigned int frameCount) {
@@ -32,7 +32,7 @@ static void dataCallback(ma_device* dev, void* out, const void* /*in*/, unsigned
     ma_uint64 framesRead = 0;
     ma_decoder_read_pcm_frames(ctx->decoder, out, frameCount, &framesRead);
     if (ctx->framePos)
-        *ctx->framePos += framesRead;
+        ctx->framePos->fetch_add(framesRead, std::memory_order_relaxed);
     if (framesRead < frameCount)
         std::memset(static_cast<char*>(out) + framesRead * ma_get_bytes_per_frame(dev->playback.format, dev->playback.channels),
                     0,
@@ -86,7 +86,7 @@ TransportWidget::~TransportWidget() {
 
 void TransportWidget::loadFile(const QString& path) {
     cleanup();
-    playbackFrame_ = 0;
+    playbackFrame_.store(0, std::memory_order_relaxed);
     loadedPath_ = path.toStdString();
     fileLabel_->setText(QFileInfo(path).fileName());
     playBtn_->setEnabled(true);
@@ -107,7 +107,7 @@ void TransportWidget::unload() {
     loadedPath_.clear();
     // originalPath_ is NOT cleared here; it is managed by setOriginalFile().
     useOriginal_   = false;
-    playbackFrame_ = 0;
+    playbackFrame_.store(0, std::memory_order_relaxed);
     fileLabel_->setText("(no output yet)");
     playBtn_->setEnabled(false);
     playBtn_->setText("▶ Play");
@@ -132,7 +132,7 @@ void TransportWidget::play() {
     }
 
     // Seek to the remembered position so A/B switches are seamless.
-    ma_decoder_seek_to_pcm_frame(maDecoder_, playbackFrame_);
+    ma_decoder_seek_to_pcm_frame(maDecoder_, playbackFrame_.load(std::memory_order_relaxed));
 
     auto* ctx = new PlaybackCtx{ maDecoder_, &playbackFrame_, &atomicRmsL_, &atomicRmsR_ };
 

@@ -54,7 +54,7 @@ private:
 
     QString      originalPath_;
     bool         useOriginal_  = false;
-    uint64_t     playbackFrame_ = 0;
+    std::atomic<uint64_t> playbackFrame_{0};
 
     std::atomic<float> atomicRmsL_{0.f};
     std::atomic<float> atomicRmsR_{0.f};
