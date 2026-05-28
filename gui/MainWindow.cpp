@@ -1,6 +1,5 @@
 #include "MainWindow.h"
-#include "AnalysisPanel.h"
-#include "ParameterPanel.h"
+#include "ChainPanel.h"
 #include "PresetSelector.h"
 #include "TargetLevelCombo.h"
 #include "TransportWidget.h"
@@ -113,12 +112,12 @@ void MainWindow::buildUi() {
         auto* row  = new QHBoxLayout;
         auto* lbl  = new QLabel("Preset:", central);
         presetSelector_ = new PresetSelector(central);
-        resetBtn_ = new QPushButton("↺ Reset", central);
+        resetBtn_ = new QPushButton(QString::fromUtf8("\xe2\x86\xba Reset"), central);
         resetBtn_->setEnabled(false);
         connect(presetSelector_, &PresetSelector::presetChanged,
                 this, &MainWindow::onPresetChanged);
         connect(resetBtn_, &QPushButton::clicked, this, [this] {
-            parameterPanel_->resetToAdvice();
+            chainPanel_->resetToAdvice();
         });
         row->addWidget(lbl);
         row->addWidget(presetSelector_, 1);
@@ -126,18 +125,15 @@ void MainWindow::buildUi() {
         vbox->addLayout(row);
     }
 
-    // ── Analysis panel + Parameter panel (scrollable) ────────────────────────
+    // ── Chain panel (scrollable) ──────────────────────────────────────────────
     {
         auto* scroll = new QScrollArea(central);
         scroll->setWidgetResizable(true);
         auto* inner  = new QWidget;
         auto* ivbox  = new QVBoxLayout(inner);
 
-        analysisPanel_ = new AnalysisPanel(inner);
-        ivbox->addWidget(analysisPanel_);
-
-        parameterPanel_ = new ParameterPanel(inner);
-        ivbox->addWidget(parameterPanel_);
+        chainPanel_ = new ChainPanel(inner);
+        ivbox->addWidget(chainPanel_);
         ivbox->addStretch();
 
         scroll->setWidget(inner);
@@ -162,7 +158,7 @@ void MainWindow::buildUi() {
         bitDepthCombo_->addItem("16-bit", 16);
         bitDepthCombo_->addItem("24-bit", 24);
         bitDepthCombo_->addItem("32-bit float", 32);
-        bitDepthCombo_->setCurrentIndex(1);  // default 24-bit
+        bitDepthCombo_->setCurrentIndex(1);
 
         flacCheck_ = new QCheckBox("FLAC", central);
 
@@ -207,8 +203,7 @@ void MainWindow::onOpenFile() {
 void MainWindow::setInputFile(const QString& path) {
     inputPath_ = path;
     inputLabel_->setText(path);
-    analysisPanel_->clear();
-    parameterPanel_->clear();
+    chainPanel_->clear();
     transport_->unload();
     transport_->setOriginalFile(path);
     renderedPath_.clear();
@@ -226,14 +221,13 @@ void MainWindow::onPresetChanged(const mt::PresetData& preset) {
 void MainWindow::startAnalysis() {
     if (inputPath_.isEmpty() || !currentPreset_) return;
 
-    // Increment sequence; any in-flight result with an older seq is discarded.
     const int seq = ++analysisSeq_;
 
     if (analysisWorker_->isRunning()) {
         analysisWorker_->requestInterruption();
         analysisWorker_->wait(500);
     }
-    statusLabel_->setText("Analysing…");
+    statusLabel_->setText(QString::fromUtf8("Analysing\xe2\x80\xa6"));
     renderButton_->setEnabled(false);
     if (resetBtn_) resetBtn_->setEnabled(false);
     analysisWorker_->setup(inputPath_.toStdString(), *currentPreset_, seq);
@@ -242,16 +236,15 @@ void MainWindow::startAnalysis() {
 
 void MainWindow::onAnalysisFinished(bool ok, const QString& errorMsg,
                                     mt::MasterResult result, int seq) {
-    if (seq != analysisSeq_) return;  // stale result — a newer analysis is in flight
+    if (seq != analysisSeq_) return;
 
     if (!ok) {
         statusLabel_->setText(QString("Analysis failed: %1").arg(errorMsg));
         return;
     }
-    analysisPanel_->setSnapshot(result.analysis);
-    parameterPanel_->setAdvice(result.advice);
+    chainPanel_->setAdvice(result.advice, result.analysis, *currentPreset_);
     resetBtn_->setEnabled(true);
-    statusLabel_->setText("Analysis complete — ready to render");
+    statusLabel_->setText(QString::fromUtf8("Analysis complete \xe2\x80\x94 ready to render"));
     renderButton_->setEnabled(true);
 }
 
@@ -262,7 +255,7 @@ void MainWindow::onRenderClicked() {
     renderedPath_ = makeDefaultOutputPath(useFlac);
     renderButton_->setEnabled(false);
 
-    auto* dlg = new QProgressDialog("Rendering…", "Cancel", 0, 100, this);
+    auto* dlg = new QProgressDialog(QString::fromUtf8("Rendering\xe2\x80\xa6"), "Cancel", 0, 100, this);
     dlg->setWindowModality(Qt::WindowModal);
     dlg->setAutoClose(false);
     progressDialog_ = dlg;
@@ -272,12 +265,13 @@ void MainWindow::onRenderClicked() {
         if (renderWorker_->isRunning()) renderWorker_->terminate();
     });
 
-    mt::RenderOptions opts = parameterPanel_->getBypassOptions();
+    mt::RenderOptions opts;
+    chainPanel_->populateBypassFlags(opts);
     opts.outputBitDepth = bitDepthCombo_->currentData().toInt();
     opts.outputFlac     = useFlac;
-    opts.targetLevel = targetCombo_->currentTarget();
+    opts.targetLevel    = targetCombo_->currentTarget();
 
-    mt::AdviceSet params = parameterPanel_->getParameters();
+    mt::AdviceSet params = chainPanel_->currentAdvice();
     renderWorker_->setup(inputPath_.toStdString(), renderedPath_.toStdString(),
                          *currentPreset_, opts, &params);
     renderWorker_->start();
@@ -305,11 +299,10 @@ void MainWindow::onRenderFinished(bool ok, const QString& errorMsg, mt::MasterRe
     }
 
     saveButton_->setEnabled(true);
-    statusLabel_->setText(QString("Rendered → %1").arg(renderedPath_));
+    statusLabel_->setText(QString("Rendered \xe2\x86\x92 %1").arg(renderedPath_));
     transport_->loadFile(renderedPath_);
 
-    analysisPanel_->setSnapshot(result.analysis);
-    parameterPanel_->setAdvice(result.advice);
+    chainPanel_->setAdvice(result.advice, result.analysis, *currentPreset_);
 }
 
 void MainWindow::onSaveAs() {
@@ -347,7 +340,6 @@ std::string MainWindow::sanitizePresetName(const std::string& name) {
     auto end = out.find_last_not_of('_');
     if (end != std::string::npos) out = out.substr(0, end + 1);
     if (out.size() > 24) out.resize(24);
-    // Strip trailing underscores that truncation may have exposed.
     auto end2 = out.find_last_not_of('_');
     if (end2 != std::string::npos) out = out.substr(0, end2 + 1);
     return out.empty() ? "preset" : out;

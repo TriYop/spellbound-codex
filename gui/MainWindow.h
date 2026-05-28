@@ -20,16 +20,13 @@ class QPushButton;
 QT_END_NAMESPACE
 
 namespace gui {
-class AnalysisPanel;
-class ParameterPanel;
+class ChainPanel;
 class PresetSelector;
 class TransportWidget;
 }
 
 namespace gui {
 
-// Worker thread for background analysis (file open / preset change).
-// Carries a sequence number so stale results can be discarded.
 class AnalysisWorker : public QThread {
     Q_OBJECT
 public:
@@ -48,7 +45,6 @@ private:
     int            seq_ = 0;
 };
 
-// Worker thread that runs the mastering pipeline without blocking the UI.
 class RenderWorker : public QThread {
     Q_OBJECT
 public:
@@ -99,29 +95,28 @@ private:
     static std::string sanitizePresetName(const std::string& name);
 
     // ── State ─────────────────────────────────────────────────────────────────
-    QString                  inputPath_;
-    QString                  renderedPath_;   // last successfully rendered output
-    std::optional<mt::PresetData>      currentPreset_;
+    QString                       inputPath_;
+    QString                       renderedPath_;
+    std::optional<mt::PresetData> currentPreset_;
 
     // ── Widgets ───────────────────────────────────────────────────────────────
-    QLabel*                 inputLabel_      = nullptr;
-    PresetSelector*         presetSelector_  = nullptr;
-    AnalysisPanel*          analysisPanel_   = nullptr;
-    ParameterPanel*         parameterPanel_  = nullptr;
-    TransportWidget*        transport_       = nullptr;
-    QPushButton*            renderButton_    = nullptr;
-    QPushButton*            saveButton_      = nullptr;
-    QPushButton*            resetBtn_        = nullptr;
-    QComboBox*              bitDepthCombo_   = nullptr;
-    QCheckBox*              flacCheck_       = nullptr;
-    TargetLevelCombo*       targetCombo_     = nullptr;
-    QLabel*                 statusLabel_     = nullptr;
+    QLabel*           inputLabel_     = nullptr;
+    PresetSelector*   presetSelector_ = nullptr;
+    ChainPanel*       chainPanel_     = nullptr;
+    TransportWidget*  transport_      = nullptr;
+    QPushButton*      renderButton_   = nullptr;
+    QPushButton*      saveButton_     = nullptr;
+    QPushButton*      resetBtn_       = nullptr;
+    QComboBox*        bitDepthCombo_  = nullptr;
+    QCheckBox*        flacCheck_      = nullptr;
+    TargetLevelCombo* targetCombo_    = nullptr;
+    QLabel*           statusLabel_    = nullptr;
 
     // ── Workers ───────────────────────────────────────────────────────────────
-    AnalysisWorker*     analysisWorker_  = nullptr;
-    int                 analysisSeq_     = 0;   // discard stale analysis results
-    RenderWorker*       renderWorker_    = nullptr;
-    QProgressDialog*    progressDialog_  = nullptr;
+    AnalysisWorker*  analysisWorker_ = nullptr;
+    int              analysisSeq_    = 0;
+    RenderWorker*    renderWorker_   = nullptr;
+    QProgressDialog* progressDialog_ = nullptr;
 };
 
 } // namespace gui
