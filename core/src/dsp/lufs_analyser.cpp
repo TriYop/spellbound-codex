@@ -18,7 +18,7 @@ BiquadCoeffs LufsAnalyser::kWeightingStage1(double sr) {
     const double K  = std::tan(std::numbers::pi_v<double> * f0 / sr);
     const double K2 = K * K;
     const double Vh = std::pow(10.0, G / 20.0);  // linear amplitude gain
-    const double Vb = std::pow(10.0, G / 40.0);  // ≈ sqrt(Vh)
+    const double Vb = std::pow(10.0, G / 40.0);  // = sqrt(Vh)
     const double n  = 1.0 / (1.0 + K / Q + K2);
     return BiquadCoeffs{
         float((Vh + Vb * K / Q + K2) * n),
@@ -91,7 +91,7 @@ float LufsAnalyser::measure(const std::vector<std::vector<float>>& samples,
 
     // ── Step 3: Absolute gate — discard blocks below -70 LUFS ────────────────
     // -70 LUFS ↔ -0.691 + 10*log10(z) = -70 → z = 10^((-70+0.691)/10)
-    constexpr double kAbsGateZ = 1.0954e-7;  // 10^(-69.309/10)
+    constexpr double kAbsGateZ = 1.1724e-7;  // 10^(-6.9309): -0.691 + 10*log10(z) = -70
     std::vector<double> gated1;
     for (double z : blockPowers)
         if (z >= kAbsGateZ) gated1.push_back(z);
