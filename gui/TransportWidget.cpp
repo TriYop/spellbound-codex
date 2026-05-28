@@ -70,12 +70,12 @@ static QString formatTime(uint64_t frames, uint32_t sampleRate) {
     const uint64_t s = totalSecs % 60;
     if (h > 0)
         return QString("%1:%2:%3")
-            .arg(h)
-            .arg(m, 2, 10, QChar('0'))
-            .arg(s, 2, 10, QChar('0'));
+            .arg(static_cast<qulonglong>(h))
+            .arg(static_cast<qulonglong>(m), 2, 10, QChar('0'))
+            .arg(static_cast<qulonglong>(s), 2, 10, QChar('0'));
     return QString("%1:%2")
-        .arg(m, 2, 10, QChar('0'))
-        .arg(s, 2, 10, QChar('0'));
+        .arg(static_cast<qulonglong>(m), 2, 10, QChar('0'))
+        .arg(static_cast<qulonglong>(s), 2, 10, QChar('0'));
 }
 
 TransportWidget::TransportWidget(QWidget* parent) : QWidget(parent) {
