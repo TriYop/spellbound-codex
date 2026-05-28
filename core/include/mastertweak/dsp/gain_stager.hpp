@@ -27,6 +27,7 @@ public:
     static float measurePeakDb(const std::vector<std::vector<float>>& buf, int numFrames);
 
 private:
+    static constexpr float kSilenceDb    = -100.f;
     static constexpr float kMaxRestoreDb = 12.f;
     static void applyGain(std::vector<std::vector<float>>& buf, int numFrames, float gainLin);
 };
