@@ -2,6 +2,12 @@ qt_add_executable(MasterTweak
     main.cpp
     MainWindow.h
     MainWindow.cpp
+    AudioControl.h
+    AudioControl.cpp
+    RotaryKnob.h
+    RotaryKnob.cpp
+    VerticalFader.h
+    VerticalFader.cpp
     ChainPanel.h
     ChainPanel.cpp
     PresetSelector.h
