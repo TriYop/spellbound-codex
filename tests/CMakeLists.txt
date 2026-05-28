@@ -7,6 +7,7 @@ add_executable(mastertweak_tests
     test_advice.cpp
     test_dsp.cpp
     test_pipeline.cpp
+    test_target_level.cpp
 )
 
 target_link_libraries(mastertweak_tests
