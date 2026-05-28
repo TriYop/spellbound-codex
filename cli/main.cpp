@@ -1,5 +1,6 @@
 #include "mastertweak/pipeline.hpp"
 #include "mastertweak/preset.hpp"
+#include "mastertweak/target_level.hpp"
 #include "mastertweak/version.hpp"
 
 #include <CLI11.hpp>
@@ -144,6 +145,17 @@ static mt::RenderOptions buildRenderOpts(int bitDepth, bool flac,
 }
 
 int main(int argc, char** argv) {
+    // ── Early exit for --list-targets (no requirements) ────────────────────────
+    for (int i = 1; i < argc; ++i) {
+        if (std::string{argv[i]} == "--list-targets") {
+            std::printf("Built-in target levels:\n");
+            for (const auto& p : mt::kTargetLevelProfiles)
+                std::printf("  %-24s  %5.1f LUFS / %4.1f dBTP\n",
+                            p.name.c_str(), p.lufs, p.peakCeiling);
+            return 0;
+        }
+    }
+
     CLI::App app{"mastertweak — offline auto-mastering driven by MixAdvice presets"};
     app.set_version_flag("--version", std::string{mastertweak::version()});
 
@@ -172,6 +184,13 @@ int main(int argc, char** argv) {
     app.add_option("--bypass", bypasses,
                    "Stages to bypass (repeat or space-separate): "
                    "eq multiband saturator width mixbuscomp limiter dither");
+
+    // ── Target level ─────────────────────────────────────────────────────────
+    std::string targetLevelName;
+    app.add_option("--target-level", targetLevelName,
+                   "Set output loudness target by platform name (case-insensitive).\n"
+                   "  e.g. --target-level spotify\n"
+                   "  Use --list-targets to see all valid names.");
 
     // ── Advice overrides ──────────────────────────────────────────────────────
     const float kNoOverride = std::numeric_limits<float>::quiet_NaN();
@@ -217,8 +236,23 @@ int main(int argc, char** argv) {
     if (verbose)
         std::printf("Preset: %s\n", preset->name.c_str());
 
-    const mt::RenderOptions renderOpts = buildRenderOpts(bitDepth, outputFormat == "flac", bypasses);
+    mt::RenderOptions renderOpts = buildRenderOpts(bitDepth, outputFormat == "flac", bypasses);
     const bool useFlac = renderOpts.outputFlac;
+
+    // ── Resolve --target-level ────────────────────────────────────────────────
+    if (!targetLevelName.empty()) {
+        const auto* tp = mt::findTargetLevel(targetLevelName);
+        if (!tp) {
+            std::fprintf(stderr, "error: unknown target level '%s'.\n",
+                         targetLevelName.c_str());
+            std::fprintf(stderr, "Built-in target levels:\n");
+            for (const auto& p : mt::kTargetLevelProfiles)
+                std::fprintf(stderr, "  %-24s  %5.1f LUFS / %4.1f dBTP\n",
+                             p.name.c_str(), p.lufs, p.peakCeiling);
+            return 1;
+        }
+        renderOpts.targetLevel = *tp;
+    }
 
     mt::ProgressCallback progressCb;
     if (verbose) {
