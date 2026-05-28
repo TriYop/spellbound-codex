@@ -38,7 +38,7 @@ static void dataCallback(ma_device* dev, void* out, const void* /*in*/, unsigned
                     (frameCount - framesRead) * ma_get_bytes_per_frame(dev->playback.format, dev->playback.channels));
 
     // Compute per-channel RMS (output is f32 because decoder is configured that way).
-    if (ctx->atomicRmsL && framesRead > 0) {
+    if (ctx->atomicRmsL && ctx->atomicRmsR && framesRead > 0) {
         const auto*        samples = static_cast<const float*>(out);
         const unsigned int ch      = dev->playback.channels;
         double sumL = 0.0, sumR = 0.0;
