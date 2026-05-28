@@ -7,6 +7,8 @@
 
 namespace gui {
 
+// QComboBox listing the 8 built-in TargetLevelProfiles plus an "Auto" entry.
+// Emits targetChanged(nullopt) for Auto, targetChanged(profile) otherwise.
 class TargetLevelCombo : public QComboBox {
     Q_OBJECT
 public:
