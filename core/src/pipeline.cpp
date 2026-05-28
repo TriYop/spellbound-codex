@@ -13,6 +13,33 @@
 #include <cmath>
 #include <cstdio>
 
+namespace {
+
+// Normalize audio in-place to targetRmsDb (broadband RMS across all channels).
+// Returns the gain applied in dB; returns 0 if silent.
+static float applyPreGain(mt::AudioFile& audio, float targetRmsDb) {
+    double sumSq = 0.0;
+    long   count = 0;
+    for (const auto& ch : audio.samples)
+        for (float s : ch) { sumSq += static_cast<double>(s) * s; ++count; }
+
+    if (count == 0) return 0.f;
+    const float rmsLin = static_cast<float>(std::sqrt(sumSq / static_cast<double>(count)));
+    if (rmsLin < 1e-7f) return 0.f;
+
+    const float measuredDb = 20.f * std::log10(rmsLin);
+    const float gainDb     = std::clamp(targetRmsDb - measuredDb, -24.f, 24.f);
+    const float gainLin    = std::pow(10.f, gainDb / 20.f);
+
+    for (auto& ch : audio.samples)
+        for (float& s : ch)
+            s *= gainLin;
+
+    return gainDb;
+}
+
+} // anonymous namespace
+
 namespace mt {
 
 MasterResult analyseOnly(const std::string& inputPath,
@@ -23,7 +50,8 @@ MasterResult analyseOnly(const std::string& inputPath,
     auto audio = readAudioFile(inputPath, errOut);
     if (!audio) return result;
 
-    result.analysis = analyseFile(*audio);
+    result.preGainDb = applyPreGain(*audio, preset.overallRmsDb);
+    result.analysis  = analyseFile(*audio);
     result.advice   = deriveAdvice(result.analysis, preset);
     result.ok       = true;
     return result;
@@ -46,6 +74,13 @@ MasterResult renderFile(const std::string&     inputPath,
     report(0.00f, "Loading");
     auto audio = readAudioFile(inputPath, errOut);
     if (!audio) return result;
+
+    // ── Pre-analysis gain staging ─────────────────────────────────────────────
+    // Normalize to the preset's target RMS so the analyser sees spectral
+    // imbalance rather than overall loudness offset (quiet tracks would
+    // otherwise receive +12 dB on every band uniformly).
+    report(0.05f, "Pre-gain staging");
+    result.preGainDb = applyPreGain(*audio, preset.overallRmsDb);
 
     // ── Analyse ───────────────────────────────────────────────────────────────
     report(0.10f, "Analysing");

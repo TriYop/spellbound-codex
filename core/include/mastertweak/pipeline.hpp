@@ -29,7 +29,8 @@ struct RenderOptions {
 struct MasterResult {
     AnalysisSnapshot analysis;
     AdviceSet        advice;
-    bool             ok      = false;
+    float            preGainDb = 0.f;  // gain applied before analysis (dB)
+    bool             ok        = false;
     std::string      errMsg;
 };
 
