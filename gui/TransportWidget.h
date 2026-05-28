@@ -9,7 +9,7 @@ QT_BEGIN_NAMESPACE
 class QPushButton;
 class QLabel;
 class QSlider;
-class QTimer;   // add this line
+class QTimer;
 QT_END_NAMESPACE
 
 struct ma_device;
@@ -39,8 +39,8 @@ public slots:
 private slots:
     void onPlayStop();
     void onAbToggle();
-    void onPositionTick();   // add
-    void onScrubReleased();  // add
+    void onPositionTick();
+    void onScrubReleased();
 
 private:
     void cleanup();
