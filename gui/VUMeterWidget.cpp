@@ -34,8 +34,8 @@ float VUMeterWidget::vuFromRms(float rms) {
 }
 
 void VUMeterWidget::onTick() {
-    smoothedL_ = alpha_ * atomicRmsL_->load(std::memory_order_relaxed) + (1.f - alpha_) * smoothedL_;
-    smoothedR_ = alpha_ * atomicRmsR_->load(std::memory_order_relaxed) + (1.f - alpha_) * smoothedR_;
+    if (atomicRmsL_) smoothedL_ = alpha_ * atomicRmsL_->load(std::memory_order_relaxed) + (1.f - alpha_) * smoothedL_;
+    if (atomicRmsR_) smoothedR_ = alpha_ * atomicRmsR_->load(std::memory_order_relaxed) + (1.f - alpha_) * smoothedR_;
     update();
 }
 
