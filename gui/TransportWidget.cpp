@@ -152,8 +152,9 @@ TransportWidget::TransportWidget(QWidget* parent) : QWidget(parent) {
     // ── Signal connections ────────────────────────────────────────────────
     connect(playBtn_,    &QPushButton::clicked,    this, &TransportWidget::onPlayStop);
     connect(abBtn_,      &QPushButton::clicked,    this, &TransportWidget::onAbToggle);
-    connect(scrubSlider_,&QSlider::sliderReleased, this, &TransportWidget::onScrubReleased);
-    connect(posTimer_,   &QTimer::timeout,         this, &TransportWidget::onPositionTick);
+    connect(scrubSlider_,&QSlider::sliderReleased,   this, &TransportWidget::onScrubReleased);
+    connect(scrubSlider_,&QSlider::actionTriggered,  this, &TransportWidget::onScrubAction);
+    connect(posTimer_,   &QTimer::timeout,           this, &TransportWidget::onPositionTick);
 }
 
 TransportWidget::~TransportWidget() {
@@ -325,6 +326,13 @@ void TransportWidget::onScrubReleased() {
                 formatTime(frame, sampleRate_) + " / " +
                 formatTime(totalFrames_, sampleRate_));
     }
+}
+
+void TransportWidget::onScrubAction(int /*action*/) {
+    // Handles keyboard navigation (arrows, PgUp/PgDn, Home/End).
+    // Skipped during mouse drag — sliderReleased owns that path.
+    if (!scrubSlider_->isSliderDown())
+        onScrubReleased();
 }
 
 void TransportWidget::updateAbButton() {

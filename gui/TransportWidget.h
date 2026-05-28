@@ -41,6 +41,7 @@ private slots:
     void onAbToggle();
     void onPositionTick();
     void onScrubReleased();
+    void onScrubAction(int action);
 
 private:
     void cleanup();
