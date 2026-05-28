@@ -1,4 +1,5 @@
 #include "TransportWidget.h"
+#include "VUMeterWidget.h"
 
 #define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>
@@ -8,11 +9,9 @@
 #include <QPushButton>
 #include <QFileInfo>
 
-#include "VUMeterWidget.h"
-
-#include <cstring>
 #include <atomic>
 #include <cmath>
+#include <cstring>
 
 namespace gui {
 
