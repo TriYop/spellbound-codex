@@ -342,6 +342,13 @@ void ChainPanel::resetToAdvice() {
     if (!hasAdvice_) return;
     applyToSpins(autoAdvice_);
     clearAllTints();
+
+    // Restore all bypass states to enabled (checked = not bypassed).
+    for (QGroupBox* box : {eqBox_, mbBox_, widthBox_, satBox_, mixbusBox_, limBox_}) {
+        box->blockSignals(true);
+        box->setChecked(true);
+        box->blockSignals(false);
+    }
 }
 
 void ChainPanel::clear() {
