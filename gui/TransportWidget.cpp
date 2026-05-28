@@ -100,7 +100,8 @@ TransportWidget::TransportWidget(QWidget* parent) : QWidget(parent) {
     {
         QFont f("monospace", 14, QFont::Bold);
         clockLabel_->setFont(f);
-        clockLabel_->setStyleSheet("color: #ffffff;");
+        clockLabel_->setStyleSheet(
+            "color: #ffffff; background-color: #1a1a1a; padding: 2px 6px; border-radius: 3px;");
         clockLabel_->setFixedWidth(
             clockLabel_->fontMetrics().horizontalAdvance("0:00:00 / 0:00:00") + 8);
     }
