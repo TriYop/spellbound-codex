@@ -16,6 +16,7 @@ add_library(mastertweak_core STATIC
     src/dsp/limiter.cpp
     src/dsp/dither.cpp
     src/dsp/lufs_analyser.cpp
+    src/dsp/gain_stager.cpp
 )
 
 target_include_directories(mastertweak_core PUBLIC
