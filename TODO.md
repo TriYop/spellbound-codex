@@ -7,7 +7,7 @@
 - ~~Process initial gain staging before analysis to avoid +12dB on all EQ bands on quiet tracks instead of tracking real level adjustments.~~ **DONE** — `applyPreGain()` in `pipeline.cpp` normalizes to `preset.overallRmsDb` before `analyseFile()` in both `renderFile()` and `analyseOnly()`.
 
 
-- ~~Make the GUI sound-engineer friendly~~ **IN PROGRESS** — Section layout done (ChainPanel: 6 bypassable sections). Knob/fader widgets done (RotaryKnob + VerticalFader via AudioControl base). Remaining: VU meter for playback.
+- ~~Make the GUI sound-engineer friendly~~ **DONE** — Section layout (ChainPanel: 6 bypassable sections), knob/fader widgets (RotaryKnob + VerticalFader), VU meter (stereo classic VU, 300 ms ballistics, integrated in TransportWidget).
 
 - ~~Add mastering setting to set overall target level (dBUFS + peak) depending on the usage. These are built-in presets based on industry standards.~~ **DONE** — `TargetLevelProfile` + `LufsAnalyser` (EBU R128) + LUFS normalisation in render pipeline + `TargetLevelCombo` GUI widget + `--target-level` / `--list-targets` CLI flags.
 
