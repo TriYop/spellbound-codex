@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QWidget>
+#include <atomic>
 #include <cstdint>
 #include <string>
 
@@ -14,6 +15,8 @@ struct ma_device;
 struct ma_decoder;
 
 namespace gui {
+
+class VUMeterWidget;
 
 // Simple audio transport: play / stop the last rendered output file via miniaudio.
 class TransportWidget : public QWidget {
@@ -52,6 +55,10 @@ private:
     QString      originalPath_;
     bool         useOriginal_  = false;
     uint64_t     playbackFrame_ = 0;
+
+    std::atomic<float> atomicRmsL_{0.f};
+    std::atomic<float> atomicRmsR_{0.f};
+    VUMeterWidget*     vuMeter_ = nullptr;
 };
 
 } // namespace gui

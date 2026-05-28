@@ -9,13 +9,17 @@
 #include <QFileInfo>
 
 #include <cstring>
+#include <atomic>
+#include <cmath>
 
 namespace gui {
 
 // Context passed to miniaudio's data callback so it can track playback position.
 struct PlaybackCtx {
-    ma_decoder* decoder;
-    uint64_t*   framePos;  // pointer into TransportWidget::playbackFrame_
+    ma_decoder*         decoder;
+    uint64_t*           framePos;  // pointer into TransportWidget::playbackFrame_
+    std::atomic<float>* atomicRmsL;
+    std::atomic<float>* atomicRmsR;
 };
 
 static void dataCallback(ma_device* dev, void* out, const void* /*in*/, unsigned int frameCount) {
@@ -32,6 +36,23 @@ static void dataCallback(ma_device* dev, void* out, const void* /*in*/, unsigned
         std::memset(static_cast<char*>(out) + framesRead * ma_get_bytes_per_frame(dev->playback.format, dev->playback.channels),
                     0,
                     (frameCount - framesRead) * ma_get_bytes_per_frame(dev->playback.format, dev->playback.channels));
+
+    // Compute per-channel RMS (output is f32 because decoder is configured that way).
+    if (ctx->atomicRmsL && framesRead > 0) {
+        const auto*        samples = static_cast<const float*>(out);
+        const unsigned int ch      = dev->playback.channels;
+        double sumL = 0.0, sumR = 0.0;
+        for (ma_uint64 i = 0; i < framesRead; ++i) {
+            float l = samples[i * ch];
+            float r = (ch > 1) ? samples[i * ch + 1] : l;
+            sumL += static_cast<double>(l) * l;
+            sumR += static_cast<double>(r) * r;
+        }
+        ctx->atomicRmsL->store(static_cast<float>(std::sqrt(sumL / static_cast<double>(framesRead))),
+                               std::memory_order_relaxed);
+        ctx->atomicRmsR->store(static_cast<float>(std::sqrt(sumR / static_cast<double>(framesRead))),
+                               std::memory_order_relaxed);
+    }
 }
 
 TransportWidget::TransportWidget(QWidget* parent) : QWidget(parent) {
@@ -101,14 +122,15 @@ void TransportWidget::play() {
     if (playing_) return;
 
     maDecoder_ = new ma_decoder;
-    if (ma_decoder_init_file(activePath.c_str(), nullptr, maDecoder_) != MA_SUCCESS) {
+    ma_decoder_config decoderCfg = ma_decoder_config_init(ma_format_f32, 0, 0);
+    if (ma_decoder_init_file(activePath.c_str(), &decoderCfg, maDecoder_) != MA_SUCCESS) {
         delete maDecoder_; maDecoder_ = nullptr; return;
     }
 
     // Seek to the remembered position so A/B switches are seamless.
     ma_decoder_seek_to_pcm_frame(maDecoder_, playbackFrame_);
 
-    auto* ctx = new PlaybackCtx{ maDecoder_, &playbackFrame_ };
+    auto* ctx = new PlaybackCtx{ maDecoder_, &playbackFrame_, &atomicRmsL_, &atomicRmsR_ };
 
     ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
     cfg.playback.format   = maDecoder_->outputFormat;
@@ -182,6 +204,8 @@ void TransportWidget::cleanup() {
         maDecoder_ = nullptr;
     }
     playing_ = false;
+    atomicRmsL_.store(0.f, std::memory_order_relaxed);
+    atomicRmsR_.store(0.f, std::memory_order_relaxed);
     // Note: playbackFrame_ is NOT reset here — stop() preserves position for resume.
 }
 
