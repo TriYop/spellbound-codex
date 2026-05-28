@@ -8,6 +8,8 @@
 #include <QPushButton>
 #include <QFileInfo>
 
+#include "VUMeterWidget.h"
+
 #include <cstring>
 #include <atomic>
 #include <cmath>
@@ -59,14 +61,17 @@ TransportWidget::TransportWidget(QWidget* parent) : QWidget(parent) {
     auto* layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
-    playBtn_  = new QPushButton("▶ Play", this);
-    abBtn_    = new QPushButton("Source: Original", this);
+    playBtn_   = new QPushButton("▶ Play", this);
+    abBtn_     = new QPushButton("Source: Original", this);
     fileLabel_ = new QLabel("(no output yet)", this);
     fileLabel_->setWordWrap(false);
+
+    vuMeter_ = new VUMeterWidget(&atomicRmsL_, &atomicRmsR_, this);
 
     layout->addWidget(playBtn_);
     layout->addWidget(abBtn_);
     layout->addWidget(fileLabel_, 1);
+    layout->addWidget(vuMeter_);
 
     playBtn_->setEnabled(false);
     abBtn_->setEnabled(false);
