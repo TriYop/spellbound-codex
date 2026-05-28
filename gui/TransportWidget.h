@@ -9,6 +9,7 @@ QT_BEGIN_NAMESPACE
 class QPushButton;
 class QLabel;
 class QSlider;
+class QTimer;   // add this line
 QT_END_NAMESPACE
 
 struct ma_device;
@@ -38,6 +39,8 @@ public slots:
 private slots:
     void onPlayStop();
     void onAbToggle();
+    void onPositionTick();   // add
+    void onScrubReleased();  // add
 
 private:
     void cleanup();
@@ -58,7 +61,14 @@ private:
 
     std::atomic<float> atomicRmsL_{0.f};
     std::atomic<float> atomicRmsR_{0.f};
-    VUMeterWidget*     vuMeter_ = nullptr;
+    VUMeterWidget*        vuMeter_      = nullptr;
+
+    // Position display
+    uint64_t              totalFrames_  = 0;
+    uint32_t              sampleRate_   = 0;
+    QTimer*               posTimer_     = nullptr;
+    QLabel*               clockLabel_   = nullptr;
+    QSlider*              scrubSlider_  = nullptr;
 };
 
 } // namespace gui

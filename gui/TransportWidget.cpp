@@ -113,6 +113,33 @@ void TransportWidget::loadFile(const QString& path) {
     fileLabel_->setText(QFileInfo(path).fileName());
     playBtn_->setEnabled(true);
     playBtn_->setText("▶ Play");
+
+    // Query total duration via a temporary decoder (opened/closed immediately).
+    totalFrames_ = 0;
+    sampleRate_  = 0;
+    ma_decoder   tmpDecoder;
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 0, 0);
+    if (ma_decoder_init_file(loadedPath_.c_str(), &cfg, &tmpDecoder) == MA_SUCCESS) {
+        ma_uint64 len = 0;
+        if (ma_decoder_get_length_in_pcm_frames(&tmpDecoder, &len) == MA_SUCCESS)
+            totalFrames_ = len;
+        sampleRate_ = tmpDecoder.outputSampleRate;
+        ma_decoder_uninit(&tmpDecoder);
+    }
+
+    if (totalFrames_ > 0 && sampleRate_ > 0) {
+        scrubSlider_->setRange(0, static_cast<int>(
+            std::min(totalFrames_, static_cast<uint64_t>(INT_MAX))));
+        scrubSlider_->setValue(0);
+        scrubSlider_->setEnabled(true);
+        clockLabel_->setText("00:00 / " + formatTime(totalFrames_, sampleRate_));
+    } else {
+        scrubSlider_->setRange(0, 1);
+        scrubSlider_->setValue(0);
+        scrubSlider_->setEnabled(false);
+        clockLabel_->setText("--:-- / --:--");
+    }
+
     updateAbButton();
 }
 
@@ -128,14 +155,20 @@ void TransportWidget::unload() {
     cleanup();
     loadedPath_.clear();
     // originalPath_ is NOT cleared here; it is managed by setOriginalFile().
-    useOriginal_   = false;
+    useOriginal_  = false;
     playbackFrame_.store(0, std::memory_order_relaxed);
+    totalFrames_  = 0;
+    sampleRate_   = 0;
     fileLabel_->setText("(no output yet)");
     playBtn_->setEnabled(false);
     playBtn_->setText("▶ Play");
     abBtn_->setText("Source: Original");
     abBtn_->setEnabled(false);
     abBtn_->setVisible(false);
+    scrubSlider_->setRange(0, 1);
+    scrubSlider_->setValue(0);
+    scrubSlider_->setEnabled(false);
+    clockLabel_->setText("--:-- / --:--");
 }
 
 void TransportWidget::play() {
@@ -207,6 +240,14 @@ void TransportWidget::onAbToggle() {
         playBtn_->setText("▶ Play"); // cleanup sets playing_=false; play() will re-set to Stop
         play();
     }
+}
+
+void TransportWidget::onPositionTick() {
+    // Implemented in Task 5.
+}
+
+void TransportWidget::onScrubReleased() {
+    // Implemented in Task 5.
 }
 
 void TransportWidget::updateAbButton() {
