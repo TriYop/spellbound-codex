@@ -8,6 +8,7 @@ add_executable(mastertweak_tests
     test_dsp.cpp
     test_pipeline.cpp
     test_target_level.cpp
+    test_gain_stager.cpp
 )
 
 target_link_libraries(mastertweak_tests
