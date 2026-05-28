@@ -79,27 +79,81 @@ static QString formatTime(uint64_t frames, uint32_t sampleRate) {
 }
 
 TransportWidget::TransportWidget(QWidget* parent) : QWidget(parent) {
-    auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
+    // ── Row 1: play controls + filename ──────────────────────────────────
+    auto* row1 = new QHBoxLayout;
+    row1->setContentsMargins(0, 0, 0, 0);
 
     playBtn_   = new QPushButton("▶ Play", this);
     abBtn_     = new QPushButton("Source: Original", this);
     fileLabel_ = new QLabel("(no output yet)", this);
     fileLabel_->setWordWrap(false);
 
+    row1->addWidget(playBtn_);
+    row1->addWidget(abBtn_);
+    row1->addWidget(fileLabel_, 1);
+
+    // ── Row 2: clock + scrub bar ─────────────────────────────────────────
+    auto* row2 = new QHBoxLayout;
+    row2->setContentsMargins(0, 0, 0, 0);
+
+    clockLabel_ = new QLabel("--:-- / --:--", this);
+    {
+        QFont f("monospace", 14, QFont::Bold);
+        clockLabel_->setFont(f);
+        clockLabel_->setStyleSheet("color: #ffffff;");
+        clockLabel_->setFixedWidth(
+            clockLabel_->fontMetrics().horizontalAdvance("0:00:00 / 0:00:00") + 8);
+    }
+    clockLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+    scrubSlider_ = new QSlider(Qt::Horizontal, this);
+    scrubSlider_->setRange(0, 1);
+    scrubSlider_->setValue(0);
+    scrubSlider_->setEnabled(false);
+    scrubSlider_->setStyleSheet(
+        "QSlider::groove:horizontal {"
+        "  height: 4px; background: #3a3a3a; border-radius: 2px; }"
+        "QSlider::sub-page:horizontal {"
+        "  background: #2a6099; border-radius: 2px; }"
+        "QSlider::handle:horizontal {"
+        "  width: 12px; height: 12px; margin: -4px 0;"
+        "  background: #ffffff; border-radius: 6px; }"
+    );
+
+    row2->addWidget(clockLabel_);
+    row2->addWidget(scrubSlider_, 1);
+
+    // ── Position timer (not started yet — started in play()) ─────────────
+    posTimer_ = new QTimer(this);
+    posTimer_->setInterval(100);  // 10 Hz
+
+    // ── Left column (both rows) ──────────────────────────────────────────
+    auto* leftCol = new QVBoxLayout;
+    leftCol->setContentsMargins(0, 0, 0, 0);
+    leftCol->setSpacing(4);
+    leftCol->addLayout(row1);
+    leftCol->addLayout(row2);
+
+    // ── VU meter spans both rows on the right ────────────────────────────
     vuMeter_ = new VUMeterWidget(&atomicRmsL_, &atomicRmsR_, this);
 
-    layout->addWidget(playBtn_);
-    layout->addWidget(abBtn_);
-    layout->addWidget(fileLabel_, 1);
-    layout->addWidget(vuMeter_);
+    // ── Outer layout ─────────────────────────────────────────────────────
+    auto* outer = new QHBoxLayout(this);
+    outer->setContentsMargins(0, 0, 0, 0);
+    outer->setSpacing(8);
+    outer->addLayout(leftCol, 1);
+    outer->addWidget(vuMeter_);
 
+    // ── Initial button state ─────────────────────────────────────────────
     playBtn_->setEnabled(false);
     abBtn_->setEnabled(false);
     abBtn_->setVisible(false);
 
-    connect(playBtn_, &QPushButton::clicked, this, &TransportWidget::onPlayStop);
-    connect(abBtn_,   &QPushButton::clicked, this, &TransportWidget::onAbToggle);
+    // ── Signal connections ────────────────────────────────────────────────
+    connect(playBtn_,    &QPushButton::clicked,    this, &TransportWidget::onPlayStop);
+    connect(abBtn_,      &QPushButton::clicked,    this, &TransportWidget::onAbToggle);
+    connect(scrubSlider_,&QSlider::sliderReleased, this, &TransportWidget::onScrubReleased);
+    connect(posTimer_,   &QTimer::timeout,         this, &TransportWidget::onPositionTick);
 }
 
 TransportWidget::~TransportWidget() {
