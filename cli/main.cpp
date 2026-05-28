@@ -145,17 +145,6 @@ static mt::RenderOptions buildRenderOpts(int bitDepth, bool flac,
 }
 
 int main(int argc, char** argv) {
-    // ── Early exit for --list-targets (no requirements) ────────────────────────
-    for (int i = 1; i < argc; ++i) {
-        if (std::string{argv[i]} == "--list-targets") {
-            std::printf("Built-in target levels:\n");
-            for (const auto& p : mt::kTargetLevelProfiles)
-                std::printf("  %-24s  %5.1f LUFS / %4.1f dBTP\n",
-                            p.name.c_str(), p.lufs, p.peakCeiling);
-            return 0;
-        }
-    }
-
     CLI::App app{"mastertweak — offline auto-mastering driven by MixAdvice presets"};
     app.set_version_flag("--version", std::string{mastertweak::version()});
 
@@ -191,6 +180,16 @@ int main(int argc, char** argv) {
                    "Set output loudness target by platform name (case-insensitive).\n"
                    "  e.g. --target-level spotify\n"
                    "  Use --list-targets to see all valid names.");
+
+    app.add_flag_callback("--list-targets",
+                          [&]() {
+                              std::printf("Built-in target levels:\n");
+                              for (const auto& p : mt::kTargetLevelProfiles)
+                                  std::printf("  %-24s  %5.1f LUFS / %4.1f dBTP\n",
+                                              p.name.c_str(), p.lufs, p.peakCeiling);
+                              std::exit(0);
+                          },
+                          "Print built-in target levels and exit.");
 
     // ── Advice overrides ──────────────────────────────────────────────────────
     const float kNoOverride = std::numeric_limits<float>::quiet_NaN();
