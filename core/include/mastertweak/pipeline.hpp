@@ -4,6 +4,7 @@
 #include "mastertweak/analysis.hpp"
 #include "mastertweak/io.hpp"
 #include "mastertweak/preset.hpp"
+#include "mastertweak/target_level.hpp"
 
 #include <functional>
 #include <optional>
@@ -21,6 +22,7 @@ struct RenderOptions {
     bool bypassMixbusComp = false;
     bool bypassLimiter  = false;
     bool bypassDither   = false;
+    std::optional<TargetLevelProfile> targetLevel;  // nullopt = derive from advice
 };
 
 // Full mastering result for one file.

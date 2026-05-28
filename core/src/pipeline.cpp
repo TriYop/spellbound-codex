@@ -7,6 +7,7 @@
 #include "mastertweak/dsp/stereo_width.hpp"
 #include "mastertweak/dsp/limiter.hpp"
 #include "mastertweak/dsp/dither.hpp"
+#include "mastertweak/dsp/lufs_analyser.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -104,12 +105,29 @@ MasterResult renderFile(const std::string&     inputPath,
         mbusComp.process(buf, nf);
     }
 
+    // ── Target-level normalisation (EBU R128) ────────────────────────────────
+    if (opts.targetLevel.has_value()) {
+        report(0.75f, "Normalising to target");
+        dsp::LufsAnalyser la;
+        la.prepare(sr, nch);
+        const float measuredLufs = la.measure(buf, nf);
+        float trimDb = opts.targetLevel->lufs - measuredLufs;
+        // Clamp to ±24 dB to guard against silence or very short inputs.
+        trimDb = std::clamp(trimDb, -24.f, 24.f);
+        const float gain = std::pow(10.f, trimDb / 20.f);
+        for (auto& ch : buf)
+            for (int f = 0; f < nf; ++f)
+                ch[static_cast<size_t>(f)] *= gain;
+        // Override the advice ceiling with the target's true-peak ceiling.
+        result.advice.limiter.ceilingDb = opts.targetLevel->peakCeiling;
+    }
+
     // ── Limiter ───────────────────────────────────────────────────────────────
     if (!opts.bypassLimiter) {
         report(0.80f, "Limiting");
         dsp::Limiter lim;
         lim.prepare(sr, nch);
-        lim.setAdvice(adv.limiter);
+        lim.setAdvice(result.advice.limiter);
         lim.process(buf, nf);
     }
 

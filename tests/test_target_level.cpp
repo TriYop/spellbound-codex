@@ -100,3 +100,69 @@ TEST_CASE("LufsAnalyser: mono input does not crash") {
     const float lufs = la.measure(buf, frames);
     CHECK(std::isfinite(lufs));
 }
+
+#include "mastertweak/pipeline.hpp"
+#include "mastertweak/io.hpp"
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+TEST_CASE("pipeline: Spotify target normalises output to ~-14 LUFS") {
+    // Build a flat preset whose overallRmsDb = -14 to avoid extreme gain trims.
+    mt::PresetData preset;
+    preset.name           = "test-flat";
+    preset.overallRmsDb   = -14.f;
+    preset.overallMinCorr = 0.5f;
+    for (int i = 0; i < 7; ++i) {
+        preset.bandRmsDb[static_cast<size_t>(i)]       = -18.f;
+        preset.bandMinCorr[static_cast<size_t>(i)]     =  0.5f;
+        preset.bandTransientDb[static_cast<size_t>(i)] =  8.f;
+    }
+
+    // Write 3-second 100 Hz stereo sine at -20 dBFS.
+    const std::string inPath  = (fs::temp_directory_path() / "mt_lufs_in.wav").string();
+    const std::string outPath = (fs::temp_directory_path() / "mt_lufs_out.wav").string();
+    {
+        mt::AudioFile af;
+        af.sampleRate  = kSrI;
+        af.numChannels = 2;
+        af.numFrames   = kSrI * 3;
+        af.bitDepth    = 24;
+        af.samples.assign(2, std::vector<float>(static_cast<size_t>(kSrI * 3)));
+        const float amp = std::pow(10.f, -20.f / 20.f);
+        for (int i = 0; i < kSrI * 3; ++i) {
+            const float s = amp * std::sin(2.f * std::numbers::pi_v<float>
+                                           * 100.f * static_cast<float>(i) / kSr);
+            af.samples[0][static_cast<size_t>(i)] = s;
+            af.samples[1][static_cast<size_t>(i)] = s;
+        }
+        REQUIRE(mt::writeAudioFile(inPath, af));
+    }
+
+    // Render with Spotify target.
+    mt::RenderOptions opts;
+    opts.targetLevel = *mt::findTargetLevel("spotify");
+
+    std::string err;
+    auto result = mt::renderFile(inPath, outPath, preset, opts, nullptr, {}, &err);
+    REQUIRE_MESSAGE(result.ok, "render failed: " << err);
+
+    // Re-measure output LUFS.
+    auto out = mt::readAudioFile(outPath);
+    REQUIRE(out.has_value());
+
+    mt::dsp::LufsAnalyser la;
+    la.prepare(kSr, 2);
+    const float measuredLufs = la.measure(out->samples, out->numFrames);
+
+    // Should land within ±2 LU of the Spotify target (-14 LUFS).
+    CHECK(measuredLufs > -16.f);
+    CHECK(measuredLufs < -12.f);
+
+    // True-peak ceiling must not exceed -1 dBTP (≈ 0.891 linear).
+    float maxAbs = 0.f;
+    for (const auto& ch : out->samples)
+        for (auto s : ch)
+            maxAbs = std::max(maxAbs, std::abs(s));
+    CHECK(maxAbs <= 0.892f);
+}
