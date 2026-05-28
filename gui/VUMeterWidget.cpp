@@ -66,7 +66,7 @@ void VUMeterWidget::paintEvent(QPaintEvent*) {
     auto drawBar = [&](int x, float rms, const char* label) {
         float vu    = vuFromRms(rms);
         float norm  = (vu - kVuMin) / range;           // 0 = -20 VU, 1 = +3 VU
-        int   fillH = static_cast<int>(norm * barH);
+        int   fillH = static_cast<int>(norm * static_cast<float>(barH));
         int   fillY = barH - fillH;                    // top pixel of filled region
 
         // Green zone: ylwThresh..barH — only the part inside the fill
