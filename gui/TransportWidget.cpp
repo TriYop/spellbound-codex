@@ -351,8 +351,8 @@ void TransportWidget::cleanup() {
     playing_ = false;
     atomicRmsL_.store(0.f, std::memory_order_relaxed);
     atomicRmsR_.store(0.f, std::memory_order_relaxed);
-    if (vuMeter_)   vuMeter_->stopMeter();
-    if (posTimer_)  posTimer_->stop();
+    if (vuMeter_)  vuMeter_->stopMeter();
+    if (posTimer_) posTimer_->stop();
     // Note: playbackFrame_ is NOT reset here — stop() preserves position for resume.
 }
 
