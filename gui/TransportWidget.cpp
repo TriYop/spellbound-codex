@@ -159,6 +159,7 @@ void TransportWidget::play() {
     }
     playing_ = true;
     playBtn_->setText("■ Stop");
+    vuMeter_->startMeter();
 }
 
 void TransportWidget::stop() {
@@ -195,9 +196,9 @@ void TransportWidget::updateAbButton() {
 
 void TransportWidget::cleanup() {
     if (maDevice_) {
+        ma_device_stop(maDevice_);   // blocks until audio thread exits — must precede ctx delete
         delete static_cast<PlaybackCtx*>(maDevice_->pUserData);
         maDevice_->pUserData = nullptr;
-        ma_device_stop(maDevice_);
         ma_device_uninit(maDevice_);
         delete maDevice_;
         maDevice_ = nullptr;
@@ -210,6 +211,7 @@ void TransportWidget::cleanup() {
     playing_ = false;
     atomicRmsL_.store(0.f, std::memory_order_relaxed);
     atomicRmsR_.store(0.f, std::memory_order_relaxed);
+    if (vuMeter_) vuMeter_->stopMeter();
     // Note: playbackFrame_ is NOT reset here — stop() preserves position for resume.
 }
 

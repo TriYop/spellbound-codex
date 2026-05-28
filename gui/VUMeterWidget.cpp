@@ -27,7 +27,20 @@ VUMeterWidget::VUMeterWidget(const std::atomic<float>* rmsL,
     timer_ = new QTimer(this);
     timer_->setInterval(1000 / kTickHz);
     connect(timer_, &QTimer::timeout, this, &VUMeterWidget::onTick);
+    // Timer is started by TransportWidget::play() via startMeter() — not here.
+}
+
+void VUMeterWidget::startMeter() {
+    smoothedL_ = 0.f;
+    smoothedR_ = 0.f;
     timer_->start();
+}
+
+void VUMeterWidget::stopMeter() {
+    timer_->stop();
+    smoothedL_ = 0.f;
+    smoothedR_ = 0.f;
+    update();  // repaint to show silence immediately
 }
 
 QSize VUMeterWidget::sizeHint() const {

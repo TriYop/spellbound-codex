@@ -19,6 +19,9 @@ public:
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
 
+    void startMeter();
+    void stopMeter();
+
 protected:
     void paintEvent(QPaintEvent*) override;
 
