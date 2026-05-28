@@ -220,13 +220,13 @@ void ChainPanel::applyToControls(const mt::AdviceSet& adv) {
         const double v = static_cast<double>(adv.eq[si].gainDb);
         eqGainFaders_[i]->blockSignals(true);
         eqGainFaders_[i]->setValue(v);
-        eqGainFaders_[i]->setClean(v);
+        eqGainFaders_[i]->setClean(eqGainFaders_[i]->value());  // post-clamp
         eqGainFaders_[i]->blockSignals(false);
     }
     auto setCtrl = [](AudioControl* c, double v) {
         c->blockSignals(true);
         c->setValue(v);
-        c->setClean(v);
+        c->setClean(c->value());  // use post-clamp value to avoid spurious dirty dot
         c->blockSignals(false);
     };
     setCtrl(satDriveKnob_,     static_cast<double>(adv.saturator.driveDb));
@@ -314,6 +314,12 @@ void ChainPanel::clear() {
     autoAdvice_ = mt::AdviceSet{};
 
     applyToControls(autoAdvice_);  // resets to defaults, clears dirty dots
+
+    for (QGroupBox* box : {eqBox_, mbBox_, widthBox_, satBox_, mixbusBox_, limBox_}) {
+        box->blockSignals(true);
+        box->setChecked(true);
+        box->blockSignals(false);
+    }
 
     const QString dash = QString::fromUtf8("\xe2\x80\x94");
     for (int i = 0; i < kNumBands; ++i)

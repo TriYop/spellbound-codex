@@ -25,24 +25,28 @@ void VerticalFader::paintControl(QPainter& p, const QRect& r) {
 
     const int cx = r.center().x();
 
+    // Constrain thumb travel to [trackTop, trackBottom] so it never exits the groove.
+    const int trackTop    = r.top() + kThumbH / 2;
+    const int trackBottom = r.bottom() - kThumbH / 2;
+    const int trackH      = trackBottom - trackTop;
+
     // Vertical groove
     const int trackX = cx - kTrackW / 2;
     p.setPen(Qt::NoPen);
     p.setBrush(QColor("#cccccc"));
-    p.drawRect(trackX, r.top() + kThumbH / 2, kTrackW, r.height() - kThumbH);
+    p.drawRect(trackX, trackTop, kTrackW, trackH);
 
     // Zero-crossing tick (if range spans 0)
     if (minVal_ < 0.0 && maxVal_ > 0.0) {
         const double normZero = -minVal_ / (maxVal_ - minVal_);
-        const int yZero = r.bottom() - static_cast<int>(normZero * static_cast<double>(r.height()));
+        const int yZero = trackBottom - static_cast<int>(normZero * static_cast<double>(trackH));
         p.setPen(QPen(QColor("#888888"), 1));
         p.drawLine(cx - 6, yZero, cx + 6, yZero);
     }
 
-    // Thumb: rounded rectangle centered on current value position
-    const int thumbY = r.bottom()
-                     - static_cast<int>(norm * static_cast<double>(r.height()))
-                     - kThumbH / 2;
+    // Thumb: rounded rectangle centred on current value position within constrained range
+    const int yValue  = trackBottom - static_cast<int>(norm * static_cast<double>(trackH));
+    const int thumbY  = yValue - kThumbH / 2;
     const QRect thumbRect(cx - kThumbW / 2, thumbY, kThumbW, kThumbH);
     p.setPen(Qt::NoPen);
     p.setBrush(QColor("#2a6099"));

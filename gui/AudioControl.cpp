@@ -25,9 +25,11 @@ AudioControl::AudioControl(QWidget* parent)
     // Hide on Enter or focus-lost; validate and apply value.
     connect(lineEdit_, &QLineEdit::editingFinished, this, [this]() {
         if (!lineEdit_->isVisible()) return;  // guard against double-fire
-        bool ok = false;
-        const double parsed = lineEdit_->text().toDouble(&ok);
+        const QString text = lineEdit_->text().trimmed();
         lineEdit_->hide();
+        if (text.isEmpty()) return;  // Escape or empty — discard
+        bool ok = false;
+        const double parsed = text.toDouble(&ok);
         if (ok) clampAndEmit(parsed);
     });
 }
