@@ -269,6 +269,7 @@ void TransportWidget::play() {
     playing_ = true;
     playBtn_->setText("■ Stop");
     vuMeter_->startMeter();
+    posTimer_->start();
 }
 
 void TransportWidget::stop() {
@@ -297,11 +298,33 @@ void TransportWidget::onAbToggle() {
 }
 
 void TransportWidget::onPositionTick() {
-    // Implemented in Task 5.
+    if (sampleRate_ == 0) return;
+    const uint64_t frame = playbackFrame_.load(std::memory_order_relaxed);
+    if (!scrubSlider_->isSliderDown())
+        scrubSlider_->setValue(static_cast<int>(
+            std::min(frame, static_cast<uint64_t>(INT_MAX))));
+    const uint64_t displayFrame = scrubSlider_->isSliderDown()
+        ? static_cast<uint64_t>(scrubSlider_->value())
+        : frame;
+    clockLabel_->setText(
+        formatTime(displayFrame, sampleRate_) + " / " +
+        formatTime(totalFrames_, sampleRate_));
 }
 
 void TransportWidget::onScrubReleased() {
-    // Implemented in Task 5.
+    const uint64_t frame = static_cast<uint64_t>(scrubSlider_->value());
+    const bool wasPlaying = playing_;
+    if (wasPlaying) cleanup();
+    playbackFrame_.store(frame, std::memory_order_relaxed);
+    if (wasPlaying) {
+        play();
+    } else {
+        // Update clock to reflect new position even when stopped.
+        if (sampleRate_ > 0)
+            clockLabel_->setText(
+                formatTime(frame, sampleRate_) + " / " +
+                formatTime(totalFrames_, sampleRate_));
+    }
 }
 
 void TransportWidget::updateAbButton() {
@@ -328,7 +351,8 @@ void TransportWidget::cleanup() {
     playing_ = false;
     atomicRmsL_.store(0.f, std::memory_order_relaxed);
     atomicRmsR_.store(0.f, std::memory_order_relaxed);
-    if (vuMeter_) vuMeter_->stopMeter();
+    if (vuMeter_)   vuMeter_->stopMeter();
+    if (posTimer_)  posTimer_->stop();
     // Note: playbackFrame_ is NOT reset here — stop() preserves position for resume.
 }
 
