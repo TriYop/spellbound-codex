@@ -8,6 +8,7 @@
 #include "mastertweak/dsp/limiter.hpp"
 #include "mastertweak/dsp/dither.hpp"
 #include "mastertweak/dsp/lufs_analyser.hpp"
+#include "mastertweak/dsp/gain_stager.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -96,6 +97,10 @@ MasterResult renderFile(const std::string&     inputPath,
     auto& buf = audio->samples;
     const int nf = audio->numFrames;
 
+    // Snapshot reference RMS (post-pre-gain, pre-DSP) for post-multiband restore.
+    dsp::GainStager gs;
+    const float rmsDbBeforeChain = dsp::GainStager::measureRmsDb(buf, nf);
+
     // ── EQ ───────────────────────────────────────────────────────────────────
     if (!opts.bypassEq) {
         report(0.25f, "EQ");
@@ -113,6 +118,12 @@ MasterResult renderFile(const std::string&     inputPath,
         mbComp.setAdvice(adv.mbComp);
         mbComp.process(buf, nf);
     }
+
+    // ── Post-multiband gain staging ──────────────────────────────────────────
+    // Restore RMS to pre-chain reference so saturator and mixbus comp see
+    // the level their advice was calibrated for.
+    report(0.40f, "Gain staging (post-multiband)");
+    result.gainStages.postMbComp = gs.restoreRms(buf, nf, rmsDbBeforeChain);
 
     // ── Saturator ────────────────────────────────────────────────────────────
     if (!opts.bypassSaturator) {
@@ -140,6 +151,11 @@ MasterResult renderFile(const std::string&     inputPath,
         mbusComp.setAdvice(adv.mixbusComp);
         mbusComp.process(buf, nf);
     }
+
+    // ── Post-mixbus gain staging ─────────────────────────────────────────────
+    // Trim peaks > -3 dBFS so the limiter operates in its clean range.
+    report(0.73f, "Gain staging (post-mixbus)");
+    result.gainStages.postMixbus = gs.trimPeak(buf, nf, -3.f);
 
     // ── Target-level normalisation (EBU R128) ────────────────────────────────
     if (opts.targetLevel.has_value()) {
