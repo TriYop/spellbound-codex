@@ -16,6 +16,8 @@ qt_add_executable(MasterTweak
     TransportWidget.cpp
     TargetLevelCombo.h
     TargetLevelCombo.cpp
+    VUMeterWidget.h
+    VUMeterWidget.cpp
 )
 
 target_link_libraries(MasterTweak
