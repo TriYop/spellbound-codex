@@ -10,6 +10,8 @@ qt_add_executable(MasterTweak
     ParameterPanel.cpp
     TransportWidget.h
     TransportWidget.cpp
+    TargetLevelCombo.h
+    TargetLevelCombo.cpp
 )
 
 target_link_libraries(MasterTweak
