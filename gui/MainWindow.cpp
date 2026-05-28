@@ -2,6 +2,7 @@
 #include "AnalysisPanel.h"
 #include "ParameterPanel.h"
 #include "PresetSelector.h"
+#include "TargetLevelCombo.h"
 #include "TransportWidget.h"
 
 #include <QApplication>
@@ -165,6 +166,9 @@ void MainWindow::buildUi() {
 
         flacCheck_ = new QCheckBox("FLAC", central);
 
+        auto* targetLbl = new QLabel("Target:", central);
+        targetCombo_ = new TargetLevelCombo(central);
+
         statusLabel_ = new QLabel("Ready", central);
 
         connect(renderButton_, &QPushButton::clicked, this, &MainWindow::onRenderClicked);
@@ -176,6 +180,9 @@ void MainWindow::buildUi() {
         row->addWidget(depthLbl);
         row->addWidget(bitDepthCombo_);
         row->addWidget(flacCheck_);
+        row->addSpacing(8);
+        row->addWidget(targetLbl);
+        row->addWidget(targetCombo_);
         row->addWidget(statusLabel_, 1);
         vbox->addLayout(row);
     }
@@ -268,6 +275,7 @@ void MainWindow::onRenderClicked() {
     mt::RenderOptions opts = parameterPanel_->getBypassOptions();
     opts.outputBitDepth = bitDepthCombo_->currentData().toInt();
     opts.outputFlac     = useFlac;
+    opts.targetLevel = targetCombo_->currentTarget();
 
     mt::AdviceSet params = parameterPanel_->getParameters();
     renderWorker_->setup(inputPath_.toStdString(), renderedPath_.toStdString(),

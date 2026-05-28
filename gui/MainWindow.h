@@ -4,6 +4,7 @@
 #include "mastertweak/analysis.hpp"
 #include "mastertweak/pipeline.hpp"
 #include "mastertweak/preset.hpp"
+#include "TargetLevelCombo.h"
 
 #include <QMainWindow>
 #include <QThread>
@@ -113,6 +114,7 @@ private:
     QPushButton*            resetBtn_        = nullptr;
     QComboBox*              bitDepthCombo_   = nullptr;
     QCheckBox*              flacCheck_       = nullptr;
+    TargetLevelCombo*       targetCombo_     = nullptr;
     QLabel*                 statusLabel_     = nullptr;
 
     // ── Workers ───────────────────────────────────────────────────────────────
