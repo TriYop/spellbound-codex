@@ -6,6 +6,17 @@
 
 namespace gui {
 
+static const QColor kColBg     ("#1a1a1a");
+static const QColor kColGreen  ("#00aa00");
+static const QColor kColYellow ("#cccc00");
+static const QColor kColRed    ("#cc0000");
+static const QColor kColWhite  ("#ffffff");
+static const QColor kColLabel  ("#aaaaaa");
+static const QColor kColTick   ("#555555");
+static const QColor kColTickLbl("#777777");
+static const QFont  kFontLabel ("sans-serif", 8);
+static const QFont  kFontTick  ("sans-serif", 7);
+
 VUMeterWidget::VUMeterWidget(const std::atomic<float>* rmsL,
                              const std::atomic<float>* rmsR,
                              QWidget* parent)
@@ -43,7 +54,7 @@ void VUMeterWidget::paintEvent(QPaintEvent*) {
     QPainter p(this);
     const int barH = height() - kLabelH;
 
-    p.fillRect(rect(), QColor("#1a1a1a"));
+    p.fillRect(rect(), kColBg);
 
     // Zone thresholds in pixel-y space.
     // y=0 = top = +3 VU; y=barH = bottom = -20 VU.
@@ -62,25 +73,25 @@ void VUMeterWidget::paintEvent(QPaintEvent*) {
         {
             int top = std::max(fillY, ylwThresh);
             if (top < barH)
-                p.fillRect(x, top, kBarW, barH - top, QColor("#00aa00"));
+                p.fillRect(x, top, kBarW, barH - top, kColGreen);
         }
         // Yellow zone: redThresh..ylwThresh
         if (fillY < ylwThresh) {
             int top = std::max(fillY, redThresh);
             if (top < ylwThresh)
-                p.fillRect(x, top, kBarW, ylwThresh - top, QColor("#cccc00"));
+                p.fillRect(x, top, kBarW, ylwThresh - top, kColYellow);
         }
         // Red zone: fillY..redThresh
         if (fillY < redThresh)
-            p.fillRect(x, fillY, kBarW, redThresh - fillY, QColor("#cc0000"));
+            p.fillRect(x, fillY, kBarW, redThresh - fillY, kColRed);
 
-        // 0 VU reference line
-        p.setPen(QPen(QColor("#ffffff"), 2));
+        // 0 VU reference line (width 1 to avoid bleeding into adjacent zone)
+        p.setPen(QPen(kColWhite, 1));
         p.drawLine(x, redThresh, x + kBarW - 1, redThresh);
 
         // Channel label
-        p.setPen(QColor("#aaaaaa"));
-        p.setFont(QFont("sans-serif", 8));
+        p.setPen(kColLabel);
+        p.setFont(kFontLabel);
         p.drawText(QRect(x, barH, kBarW, kLabelH), Qt::AlignCenter, QString(label));
     };
 
@@ -97,12 +108,12 @@ void VUMeterWidget::paintEvent(QPaintEvent*) {
         {-10.f,"-10",  false },
         {-20.f,"-20",  false },
     };
-    p.setFont(QFont("sans-serif", 7));
+    p.setFont(kFontTick);
     for (const auto& t : ticks) {
-        int y = static_cast<int>((kVuMax - t.vu) / range * barH);
-        p.setPen(QPen(t.thick ? QColor("#ffffff") : QColor("#555555"), t.thick ? 2 : 1));
+        int y = std::max(1, static_cast<int>((kVuMax - t.vu) / range * static_cast<float>(barH)));
+        p.setPen(QPen(t.thick ? kColWhite : kColTick, t.thick ? 2 : 1));
         p.drawLine(tickX, y, tickX + 3, y);
-        p.setPen(QColor("#777777"));
+        p.setPen(kColTickLbl);
         p.drawText(tickX + 5, y + 4, t.lbl);
     }
 }
