@@ -6,10 +6,6 @@ qt_add_executable(MasterTweak
     ChainPanel.cpp
     PresetSelector.h
     PresetSelector.cpp
-    AnalysisPanel.h
-    AnalysisPanel.cpp
-    ParameterPanel.h
-    ParameterPanel.cpp
     TransportWidget.h
     TransportWidget.cpp
     TargetLevelCombo.h
