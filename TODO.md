@@ -1,6 +1,6 @@
 # Next features and evolutions to implement
 
-- Sort presets alphabetically
+- ~~Sort presets alphabetically~~ **DONE** — `enumeratePresets()` in `preset.cpp` sorts results case-insensitively before returning.
 
 - Ensure optimal gain staging before/between each part of the mastering chain to ensure best audio treatment quality
 

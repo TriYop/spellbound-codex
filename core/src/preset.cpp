@@ -2,6 +2,8 @@
 
 #include <pugixml.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <unordered_set>
@@ -136,6 +138,15 @@ std::vector<PresetData> enumeratePresets(const std::string& executableDir) {
     if (!executableDir.empty())
         addDir(executableDir + "/presets");
     addDir(userPresetsDir());
+
+    std::sort(result.begin(), result.end(), [](const PresetData& a, const PresetData& b) {
+        auto toLower = [](const std::string& s) {
+            std::string t = s;
+            for (char& c : t) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            return t;
+        };
+        return toLower(a.name) < toLower(b.name);
+    });
 
     return result;
 }
