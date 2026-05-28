@@ -77,19 +77,19 @@ TEST_CASE("LufsAnalyser: short buffer below one block returns floor") {
     CHECK(lufs <= -69.f);
 }
 
-TEST_CASE("LufsAnalyser: stereo 100 Hz sine at -20 dBFS -> ~-20.7 LUFS") {
+TEST_CASE("LufsAnalyser: stereo 100 Hz sine at -20 dBFS -> ~-21.87 LUFS") {
     // Peak amplitude -20 dBFS: A = 10^(-20/20) = 0.1
-    // K-weighting stage 2 (HP at 38 Hz) attenuates 100 Hz by ~-1.18 dB at 44100 Hz,
-    // so actual result is ~-21.87 LUFS. Tolerance is ±2 dB around ideal -20.691.
-    //   z = A^2 * G^2 (G = K-weighted gain at 100 Hz)
-    //   LUFS = -0.691 + 10*log10(z)
+    // K-weighting stage 2 (HP at 38 Hz) attenuates 100 Hz by ~-1.18 dB at 44100 Hz.
+    // Without K-weighting: LUFS = -0.691 + 10*log10(A^2) = -20.691
+    // With -1.18 dB attenuation: LUFS ≈ -20.691 - 1.18 = -21.87
+    // Tolerance ±0.5 LU around the analytically expected value.
     const float A = std::pow(10.f, -20.f / 20.f);
     auto buf = makeTestSine(A, 3.f);
     mt::dsp::LufsAnalyser la;
     la.prepare(kSr, 2);
     const float lufs = la.measure(buf, static_cast<int>(3.f * kSr));
-    CHECK(lufs > -23.0f);
-    CHECK(lufs < -19.0f);
+    CHECK(lufs > -22.4f);
+    CHECK(lufs < -21.4f);
 }
 
 TEST_CASE("LufsAnalyser: mono input does not crash") {
@@ -155,9 +155,9 @@ TEST_CASE("pipeline: Spotify target normalises output to ~-14 LUFS") {
     la.prepare(kSr, 2);
     const float measuredLufs = la.measure(out->samples, out->numFrames);
 
-    // Should land within ±2 LU of the Spotify target (-14 LUFS).
-    CHECK(measuredLufs > -16.f);
-    CHECK(measuredLufs < -12.f);
+    // Should land within ±1.5 LU of the Spotify target (-14 LUFS).
+    CHECK(measuredLufs > -15.5f);
+    CHECK(measuredLufs < -12.5f);
 
     // Sample-peak must not exceed -1 dBFS (≈ 0.891). The limiter uses sample-peak
     // detection (not 4× oversampled true-peak) so this is the enforced constraint.

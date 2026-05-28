@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace mt {
 
@@ -107,7 +108,7 @@ MasterResult renderFile(const std::string&     inputPath,
 
     // ── Target-level normalisation (EBU R128) ────────────────────────────────
     if (opts.targetLevel.has_value()) {
-        report(0.75f, "Normalising to target");
+        report(0.75f, "Normalizing to target");
         dsp::LufsAnalyser la;
         la.prepare(sr, nch);
         const float measuredLufs = la.measure(buf, nf);
@@ -119,6 +120,12 @@ MasterResult renderFile(const std::string&     inputPath,
             for (int f = 0; f < nf; ++f)
                 ch[static_cast<size_t>(f)] *= gain;
         // Override ceiling and LUFS target in the returned advice (GUI display).
+        // Warn if an explicit ceiling override was also supplied — target-level wins.
+        if (adviceOverride
+                && adviceOverride->limiter.ceilingDb != opts.targetLevel->peakCeiling)
+            std::fprintf(stderr, "warning: --target-level overrides --override-limiter-ceiling"
+                                 " (ceiling set to %.1f dBTP)\n",
+                         static_cast<double>(opts.targetLevel->peakCeiling));
         result.advice.limiter.ceilingDb        = opts.targetLevel->peakCeiling;
         result.advice.limiter.targetLufsApprox = opts.targetLevel->lufs;
     }
