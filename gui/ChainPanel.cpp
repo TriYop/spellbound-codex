@@ -1,10 +1,12 @@
 #include "ChainPanel.h"
+#include "AudioControl.h"
+#include "RotaryKnob.h"
+#include "VerticalFader.h"
 
 #include "mastertweak/analysis.hpp"
 
 #include <cmath>
 
-#include <QDoubleSpinBox>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -24,11 +26,10 @@ void ChainPanel::buildUi() {
     outer->setContentsMargins(0, 0, 0, 0);
 
     auto* grid = new QGridLayout;
-    // Equal column weights; Mixbus spans cols 0-3, Limiter spans cols 4-5.
     for (int c = 0; c < 6; ++c)
         grid->setColumnStretch(c, 1);
 
-    // ── Tier 1: EQ (full width) ───────────────────────────────────────────────
+    // ── Tier 1: EQ ────────────────────────────────────────────────────────────
     {
         eqBox_ = new QGroupBox("EQ", this);
         eqBox_->setCheckable(true);
@@ -50,24 +51,18 @@ void ChainPanel::buildUi() {
             eqReadouts_[i] = readout;
             col->addWidget(readout);
 
-            auto* sp = new QDoubleSpinBox(eqBox_);
-            sp->setRange(-12.0, 12.0);
-            sp->setSingleStep(0.5);
-            sp->setDecimals(1);
-            sp->setSuffix(" dB");
-            sp->setValue(0.0);
-            sp->setAlignment(Qt::AlignRight);
-            eqGainSpins_[i] = sp;
-            col->addWidget(sp);
+            auto* fdr = new VerticalFader(eqBox_);
+            fdr->setRange(-12.0, 12.0);
+            fdr->setSingleStep(0.5);
+            fdr->setSuffix(" dB");
+            fdr->setValue(0.0);
+            eqGainFaders_[i] = fdr;
+            col->addWidget(fdr, 0, Qt::AlignHCenter);
 
             hbox->addLayout(col);
 
-            const int ci = i;
-            connect(sp, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                    this, [this, ci](double) {
-                        updateTint(eqGainSpins_[ci], cleanValues_.eqGain[ci]);
-                        emitOverride();
-                    });
+            connect(fdr, &AudioControl::valueChanged,
+                    this, [this](double) { emitOverride(); });
         }
         connect(eqBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
         grid->addWidget(eqBox_, 0, 0, 1, 6);
@@ -119,24 +114,20 @@ void ChainPanel::buildUi() {
         satCrestLbl_ = new QLabel(QString::fromUtf8("\xe2\x80\x94"), satBox_);
         vbox->addWidget(satCrestLbl_);
 
-        auto* row = new QHBoxLayout;
-        row->addWidget(new QLabel("Drive:", satBox_));
-        satDriveSpin_ = new QDoubleSpinBox(satBox_);
-        satDriveSpin_->setRange(0.0, 6.0);
-        satDriveSpin_->setSingleStep(0.5);
-        satDriveSpin_->setDecimals(1);
-        satDriveSpin_->setSuffix(" dB");
-        satDriveSpin_->setValue(0.0);
-        row->addWidget(satDriveSpin_);
-        row->addStretch();
-        vbox->addLayout(row);
+        auto* drvLbl = new QLabel("Drive", satBox_);
+        drvLbl->setAlignment(Qt::AlignHCenter);
+        vbox->addWidget(drvLbl);
+
+        satDriveKnob_ = new RotaryKnob(satBox_);
+        satDriveKnob_->setRange(0.0, 6.0);
+        satDriveKnob_->setSingleStep(0.5);
+        satDriveKnob_->setSuffix(" dB");
+        satDriveKnob_->setValue(0.0);
+        vbox->addWidget(satDriveKnob_, 0, Qt::AlignHCenter);
         vbox->addStretch();
 
-        connect(satDriveSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                this, [this](double) {
-                    updateTint(satDriveSpin_, cleanValues_.satDrive);
-                    emitOverride();
-                });
+        connect(satDriveKnob_, &AudioControl::valueChanged,
+                this, [this](double) { emitOverride(); });
         connect(satBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
         grid->addWidget(satBox_, 1, 4, 1, 2);
     }
@@ -148,25 +139,32 @@ void ChainPanel::buildUi() {
         mixbusBox_->setChecked(true);
 
         auto* vbox = new QVBoxLayout(mixbusBox_);
+        auto* row  = new QHBoxLayout;
 
-        auto* row = new QHBoxLayout;
-        row->addWidget(new QLabel("Thr:", mixbusBox_));
-        mixbusThreshSpin_ = new QDoubleSpinBox(mixbusBox_);
-        mixbusThreshSpin_->setRange(-40.0, 0.0);
-        mixbusThreshSpin_->setSingleStep(1.0);
-        mixbusThreshSpin_->setDecimals(1);
-        mixbusThreshSpin_->setSuffix(" dB");
-        mixbusThreshSpin_->setValue(-20.0);
-        row->addWidget(mixbusThreshSpin_);
-        row->addSpacing(8);
-        row->addWidget(new QLabel("Mkup:", mixbusBox_));
-        mixbusMakeupSpin_ = new QDoubleSpinBox(mixbusBox_);
-        mixbusMakeupSpin_->setRange(-12.0, 12.0);
-        mixbusMakeupSpin_->setSingleStep(0.5);
-        mixbusMakeupSpin_->setDecimals(1);
-        mixbusMakeupSpin_->setSuffix(" dB");
-        mixbusMakeupSpin_->setValue(0.0);
-        row->addWidget(mixbusMakeupSpin_);
+        auto* thrCol = new QVBoxLayout;
+        auto* thrLbl = new QLabel("Thr", mixbusBox_);
+        thrLbl->setAlignment(Qt::AlignHCenter);
+        thrCol->addWidget(thrLbl);
+        mixbusThreshKnob_ = new RotaryKnob(mixbusBox_);
+        mixbusThreshKnob_->setRange(-40.0, 0.0);
+        mixbusThreshKnob_->setSingleStep(1.0);
+        mixbusThreshKnob_->setSuffix(" dB");
+        mixbusThreshKnob_->setValue(-20.0);
+        thrCol->addWidget(mixbusThreshKnob_, 0, Qt::AlignHCenter);
+        row->addLayout(thrCol);
+
+        auto* mkupCol = new QVBoxLayout;
+        auto* mkupLbl = new QLabel("Mkup", mixbusBox_);
+        mkupLbl->setAlignment(Qt::AlignHCenter);
+        mkupCol->addWidget(mkupLbl);
+        mixbusMakeupKnob_ = new RotaryKnob(mixbusBox_);
+        mixbusMakeupKnob_->setRange(-12.0, 12.0);
+        mixbusMakeupKnob_->setSingleStep(0.5);
+        mixbusMakeupKnob_->setSuffix(" dB");
+        mixbusMakeupKnob_->setValue(0.0);
+        mkupCol->addWidget(mixbusMakeupKnob_, 0, Qt::AlignHCenter);
+        row->addLayout(mkupCol);
+
         row->addStretch();
         vbox->addLayout(row);
 
@@ -174,16 +172,10 @@ void ChainPanel::buildUi() {
         mixbusRmsLbl_->setStyleSheet("color: #555;");
         vbox->addWidget(mixbusRmsLbl_);
 
-        connect(mixbusThreshSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                this, [this](double) {
-                    updateTint(mixbusThreshSpin_, cleanValues_.mixbusThresh);
-                    emitOverride();
-                });
-        connect(mixbusMakeupSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                this, [this](double) {
-                    updateTint(mixbusMakeupSpin_, cleanValues_.mixbusMakeup);
-                    emitOverride();
-                });
+        connect(mixbusThreshKnob_, &AudioControl::valueChanged,
+                this, [this](double) { emitOverride(); });
+        connect(mixbusMakeupKnob_, &AudioControl::valueChanged,
+                this, [this](double) { emitOverride(); });
         connect(mixbusBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
         grid->addWidget(mixbusBox_, 2, 0, 1, 4);
     }
@@ -196,27 +188,23 @@ void ChainPanel::buildUi() {
 
         auto* vbox = new QVBoxLayout(limBox_);
 
-        auto* row = new QHBoxLayout;
-        row->addWidget(new QLabel("Ceil:", limBox_));
-        limCeilingSpin_ = new QDoubleSpinBox(limBox_);
-        limCeilingSpin_->setRange(-6.0, 0.0);
-        limCeilingSpin_->setSingleStep(0.5);
-        limCeilingSpin_->setDecimals(1);
-        limCeilingSpin_->setSuffix(" dBTP");
-        limCeilingSpin_->setValue(-1.0);
-        row->addWidget(limCeilingSpin_);
-        row->addStretch();
-        vbox->addLayout(row);
+        auto* ceilLbl = new QLabel("Ceiling", limBox_);
+        ceilLbl->setAlignment(Qt::AlignHCenter);
+        vbox->addWidget(ceilLbl);
+
+        limCeilingFader_ = new VerticalFader(limBox_);
+        limCeilingFader_->setRange(-6.0, 0.0);
+        limCeilingFader_->setSingleStep(0.5);
+        limCeilingFader_->setSuffix(" dBTP");
+        limCeilingFader_->setValue(-1.0);
+        vbox->addWidget(limCeilingFader_);
 
         limPeakLbl_ = new QLabel(QString::fromUtf8("\xe2\x80\x94"), limBox_);
         limPeakLbl_->setStyleSheet("color: #555;");
         vbox->addWidget(limPeakLbl_);
 
-        connect(limCeilingSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                this, [this](double) {
-                    updateTint(limCeilingSpin_, cleanValues_.limCeiling);
-                    emitOverride();
-                });
+        connect(limCeilingFader_, &AudioControl::valueChanged,
+                this, [this](double) { emitOverride(); });
         connect(limBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
         grid->addWidget(limBox_, 2, 4, 1, 2);
     }
@@ -226,43 +214,25 @@ void ChainPanel::buildUi() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-void ChainPanel::applyToSpins(const mt::AdviceSet& adv) {
+void ChainPanel::applyToControls(const mt::AdviceSet& adv) {
     for (int i = 0; i < kNumBands; ++i) {
         const auto si = static_cast<size_t>(i);
-        eqGainSpins_[i]->blockSignals(true);
-        eqGainSpins_[i]->setValue(static_cast<double>(adv.eq[si].gainDb));
-        eqGainSpins_[i]->blockSignals(false);
+        const double v = static_cast<double>(adv.eq[si].gainDb);
+        eqGainFaders_[i]->blockSignals(true);
+        eqGainFaders_[i]->setValue(v);
+        eqGainFaders_[i]->setClean(v);
+        eqGainFaders_[i]->blockSignals(false);
     }
-    limCeilingSpin_->blockSignals(true);
-    limCeilingSpin_->setValue(static_cast<double>(adv.limiter.ceilingDb));
-    limCeilingSpin_->blockSignals(false);
-
-    satDriveSpin_->blockSignals(true);
-    satDriveSpin_->setValue(static_cast<double>(adv.saturator.driveDb));
-    satDriveSpin_->blockSignals(false);
-
-    mixbusThreshSpin_->blockSignals(true);
-    mixbusThreshSpin_->setValue(static_cast<double>(adv.mixbusComp.thresholdDb));
-    mixbusThreshSpin_->blockSignals(false);
-
-    mixbusMakeupSpin_->blockSignals(true);
-    mixbusMakeupSpin_->setValue(static_cast<double>(adv.mixbusComp.makeupDb));
-    mixbusMakeupSpin_->blockSignals(false);
-}
-
-void ChainPanel::updateTint(QDoubleSpinBox* sp, double cleanVal) {
-    constexpr double kEps = 1e-9;
-    sp->setStyleSheet(std::abs(sp->value() - cleanVal) > kEps
-                      ? "background-color: #d0e8ff;" : "");
-}
-
-void ChainPanel::clearAllTints() {
-    for (int i = 0; i < kNumBands; ++i)
-        eqGainSpins_[i]->setStyleSheet("");
-    limCeilingSpin_->setStyleSheet("");
-    satDriveSpin_->setStyleSheet("");
-    mixbusThreshSpin_->setStyleSheet("");
-    mixbusMakeupSpin_->setStyleSheet("");
+    auto setCtrl = [](AudioControl* c, double v) {
+        c->blockSignals(true);
+        c->setValue(v);
+        c->setClean(v);
+        c->blockSignals(false);
+    };
+    setCtrl(satDriveKnob_,     static_cast<double>(adv.saturator.driveDb));
+    setCtrl(mixbusThreshKnob_, static_cast<double>(adv.mixbusComp.thresholdDb));
+    setCtrl(mixbusMakeupKnob_, static_cast<double>(adv.mixbusComp.makeupDb));
+    setCtrl(limCeilingFader_,  static_cast<double>(adv.limiter.ceilingDb));
 }
 
 void ChainPanel::emitOverride() {
@@ -277,15 +247,7 @@ void ChainPanel::setAdvice(const mt::AdviceSet& advice,
     autoAdvice_ = advice;
     hasAdvice_  = true;
 
-    for (int i = 0; i < kNumBands; ++i)
-        cleanValues_.eqGain[i] = static_cast<double>(advice.eq[static_cast<size_t>(i)].gainDb);
-    cleanValues_.limCeiling   = static_cast<double>(advice.limiter.ceilingDb);
-    cleanValues_.satDrive     = static_cast<double>(advice.saturator.driveDb);
-    cleanValues_.mixbusThresh = static_cast<double>(advice.mixbusComp.thresholdDb);
-    cleanValues_.mixbusMakeup = static_cast<double>(advice.mixbusComp.makeupDb);
-
-    applyToSpins(advice);
-    clearAllTints();
+    applyToControls(advice);
 
     // EQ per-band readouts: "preset target → measured RMS"
     for (int i = 0; i < kNumBands; ++i) {
@@ -296,21 +258,19 @@ void ChainPanel::setAdvice(const mt::AdviceSet& advice,
                 .arg(static_cast<int>(std::round(snap.bands[si].avgRmsDb))));
     }
 
-    // Average crest factor (shared by MB Comp and Saturator sections)
     float crestSum = 0.f;
     for (int i = 0; i < kNumBands; ++i)
         crestSum += snap.bands[static_cast<size_t>(i)].crestDb;
     const float avgCrest = crestSum / static_cast<float>(kNumBands);
 
-    mbCrestLbl_->setText(QString("Crest: %1 dB").arg(static_cast<double>(avgCrest), 0, 'f', 1));
-    satCrestLbl_->setText(QString("Crest: %1 dB").arg(static_cast<double>(avgCrest), 0, 'f', 1));
-
+    mbCrestLbl_->setText(
+        QString("Crest: %1 dB").arg(static_cast<double>(avgCrest), 0, 'f', 1));
+    satCrestLbl_->setText(
+        QString("Crest: %1 dB").arg(static_cast<double>(avgCrest), 0, 'f', 1));
     widthCorrLbl_->setText(
         QString("Corr: %1").arg(static_cast<double>(snap.overallCorr), 0, 'f', 2));
-
     mixbusRmsLbl_->setText(
         QString("rms: %1 dBFS").arg(static_cast<double>(snap.overallAvgDb), 0, 'f', 1));
-
     limPeakLbl_->setText(
         QString("peak: %1 dBFS").arg(static_cast<double>(snap.overallPeakDb), 0, 'f', 1));
 }
@@ -319,12 +279,12 @@ mt::AdviceSet ChainPanel::currentAdvice() const {
     mt::AdviceSet adv = autoAdvice_;
     for (int i = 0; i < kNumBands; ++i) {
         const auto si = static_cast<size_t>(i);
-        adv.eq[si].gainDb = static_cast<float>(eqGainSpins_[i]->value());
+        adv.eq[si].gainDb = static_cast<float>(eqGainFaders_[i]->value());
     }
-    adv.limiter.ceilingDb      = static_cast<float>(limCeilingSpin_->value());
-    adv.saturator.driveDb      = static_cast<float>(satDriveSpin_->value());
-    adv.mixbusComp.thresholdDb = static_cast<float>(mixbusThreshSpin_->value());
-    adv.mixbusComp.makeupDb    = static_cast<float>(mixbusMakeupSpin_->value());
+    adv.limiter.ceilingDb      = static_cast<float>(limCeilingFader_->value());
+    adv.saturator.driveDb      = static_cast<float>(satDriveKnob_->value());
+    adv.mixbusComp.thresholdDb = static_cast<float>(mixbusThreshKnob_->value());
+    adv.mixbusComp.makeupDb    = static_cast<float>(mixbusMakeupKnob_->value());
     return adv;
 }
 
@@ -340,10 +300,8 @@ void ChainPanel::populateBypassFlags(mt::RenderOptions& opts) const {
 
 void ChainPanel::resetToAdvice() {
     if (!hasAdvice_) return;
-    applyToSpins(autoAdvice_);
-    clearAllTints();
+    applyToControls(autoAdvice_);
 
-    // Restore all bypass states to enabled (checked = not bypassed).
     for (QGroupBox* box : {eqBox_, mbBox_, widthBox_, satBox_, mixbusBox_, limBox_}) {
         box->blockSignals(true);
         box->setChecked(true);
@@ -352,36 +310,14 @@ void ChainPanel::resetToAdvice() {
 }
 
 void ChainPanel::clear() {
-    hasAdvice_ = false;
+    hasAdvice_  = false;
     autoAdvice_ = mt::AdviceSet{};
 
-    for (int i = 0; i < kNumBands; ++i) cleanValues_.eqGain[i] = 0.0;
-    cleanValues_.limCeiling   = -1.0;
-    cleanValues_.satDrive     =  0.0;
-    cleanValues_.mixbusThresh = -20.0;
-    cleanValues_.mixbusMakeup =  0.0;
+    applyToControls(autoAdvice_);  // resets to defaults, clears dirty dots
 
     const QString dash = QString::fromUtf8("\xe2\x80\x94");
-
-    for (int i = 0; i < kNumBands; ++i) {
-        eqGainSpins_[i]->blockSignals(true);
-        eqGainSpins_[i]->setValue(0.0);
-        eqGainSpins_[i]->blockSignals(false);
-        eqGainSpins_[i]->setStyleSheet("");
+    for (int i = 0; i < kNumBands; ++i)
         eqReadouts_[i]->setText(dash);
-    }
-
-    auto resetSpin = [](QDoubleSpinBox* sp, double val) {
-        sp->blockSignals(true);
-        sp->setValue(val);
-        sp->blockSignals(false);
-        sp->setStyleSheet("");
-    };
-    resetSpin(limCeilingSpin_,    -1.0);
-    resetSpin(satDriveSpin_,       0.0);
-    resetSpin(mixbusThreshSpin_, -20.0);
-    resetSpin(mixbusMakeupSpin_,   0.0);
-
     mbCrestLbl_->setText(dash);
     widthCorrLbl_->setText(dash);
     satCrestLbl_->setText(dash);
