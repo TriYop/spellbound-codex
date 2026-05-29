@@ -21,6 +21,7 @@ QT_END_NAMESPACE
 
 namespace gui {
 class ChainPanel;
+class PresetBuilderDialog;
 class PresetSelector;
 class TransportWidget;
 }
@@ -86,6 +87,7 @@ private slots:
     void onAnalysisFinished(bool ok, const QString& errorMsg, mt::MasterResult result, int seq);
     void onRenderProgress(float fraction, const QString& stage);
     void onRenderFinished(bool ok, const QString& errorMsg, mt::MasterResult result);
+    void onManagePresets();
 
 private:
     void buildUi();
@@ -109,6 +111,8 @@ private:
     QCheckBox*        flacCheck_      = nullptr;
     TargetLevelCombo* targetCombo_    = nullptr;
     QLabel*           statusLabel_    = nullptr;
+
+    PresetBuilderDialog* presetBuilderDialog_ = nullptr;
 
     // ── Workers ───────────────────────────────────────────────────────────────
     AnalysisWorker*  analysisWorker_ = nullptr;

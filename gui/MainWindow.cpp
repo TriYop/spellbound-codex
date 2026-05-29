@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "ChainPanel.h"
+#include "PresetBuilderDialog.h"
 #include "PresetSelector.h"
 #include "TargetLevelCombo.h"
 #include "TransportWidget.h"
@@ -117,6 +118,8 @@ void MainWindow::buildUi() {
         resetBtn_->setEnabled(false);
         connect(presetSelector_, &PresetSelector::presetChanged,
                 this, &MainWindow::onPresetChanged);
+        connect(presetSelector_, &PresetSelector::manageRequested,
+                this, &MainWindow::onManagePresets);
         connect(resetBtn_, &QPushButton::clicked, this, [this] {
             chainPanel_->resetToAdvice();
         });
@@ -328,6 +331,26 @@ QString MainWindow::makeDefaultOutputPath(bool flac) const {
     const std::string stem = p.stem().string() + "_" + suffix;
     return QString::fromStdString(
         (p.parent_path() / (stem + (flac ? ".flac" : ".wav"))).string());
+}
+
+void MainWindow::onManagePresets() {
+    if (!presetBuilderDialog_) {
+        const std::string execDir = fs::path{
+            QApplication::applicationFilePath().toStdString()
+        }.parent_path().string();
+
+        presetBuilderDialog_ = new PresetBuilderDialog(execDir, this);
+        connect(presetBuilderDialog_, &PresetBuilderDialog::presetExported,
+                this, [this] {
+                    const std::string execDir2 = fs::path{
+                        QApplication::applicationFilePath().toStdString()
+                    }.parent_path().string();
+                    presetSelector_->populate(execDir2);
+                });
+    }
+    presetBuilderDialog_->show();
+    presetBuilderDialog_->raise();
+    presetBuilderDialog_->activateWindow();
 }
 
 } // namespace gui

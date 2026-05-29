@@ -14,13 +14,17 @@ PresetSelector::PresetSelector(QWidget* parent) : QWidget(parent) {
     combo_   = new QComboBox(this);
     openBtn_ = new QPushButton("Open…", this);
     openBtn_->setFixedWidth(70);
+    manageBtn_ = new QPushButton(QString::fromUtf8("Manage presets\xe2\x80\xa6"), this);
+    manageBtn_->setFixedWidth(140);
 
     layout->addWidget(combo_, 1);
     layout->addWidget(openBtn_);
+    layout->addWidget(manageBtn_);
 
     connect(combo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &PresetSelector::onComboChanged);
     connect(openBtn_, &QPushButton::clicked, this, &PresetSelector::onOpenFile);
+    connect(manageBtn_, &QPushButton::clicked, this, &PresetSelector::manageRequested);
 }
 
 void PresetSelector::populate(const std::string& executableDir) {

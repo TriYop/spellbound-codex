@@ -27,6 +27,7 @@ public:
 
 signals:
     void presetChanged(const mt::PresetData& preset);
+    void manageRequested();
 
 private slots:
     void onComboChanged(int index);
@@ -35,6 +36,7 @@ private slots:
 private:
     QComboBox*  combo_   = nullptr;
     QPushButton* openBtn_ = nullptr;
+    QPushButton* manageBtn_ = nullptr;
 
     std::vector<mt::PresetData> presets_;
 };
