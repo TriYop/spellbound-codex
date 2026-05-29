@@ -342,3 +342,108 @@ TEST_CASE("IngestService::ingest directory: scans recursively") {
 
     fs_ingest::remove_all(dir);
 }
+
+#include "preset_builder/adapters/database.hpp"
+#include "preset_builder/adapters/sqlite_track_repository.hpp"
+
+static pb::Track makeSampleTrack(const std::string& hash = "abc123",
+                                 const std::string& path = "/tmp/song.wav") {
+    pb::Track t;
+    t.id      = pb::TrackId{hash};
+    t.path    = path;
+    t.addedAt = "2026-05-29T12:00:00Z";
+    t.metadata.artist = "Test Artist";
+    t.metadata.title  = "Test Song";
+    t.metadata.genre  = "Rock";
+    t.metadata.source = pb::MetadataSource::filename;
+    t.analysis.bandRmsDb[0]       = -20.f;
+    t.analysis.bandCorr[0]        =  0.9f;
+    t.analysis.bandTransientDb[0] =  6.f;
+    t.analysis.overallRmsDb       = -18.f;
+    t.analysis.overallCorr        =  0.85f;
+    return t;
+}
+
+TEST_CASE("SqliteTrackRepository: save and find by id") {
+    pb::Database db(":memory:");
+    pb::SqliteTrackRepository repo(db);
+
+    const auto track = makeSampleTrack("hash001");
+    repo.save(track);
+
+    const auto found = repo.find(pb::TrackId{"hash001"});
+    REQUIRE(found.has_value());
+    CHECK(found->id.hash               == "hash001");
+    CHECK(found->path                  == "/tmp/song.wav");
+    CHECK(found->metadata.artist       == track.metadata.artist);
+    CHECK(found->metadata.title        == track.metadata.title);
+    CHECK(found->metadata.genre        == track.metadata.genre);
+    CHECK(found->analysis.bandRmsDb[0]  == doctest::Approx(-20.f));
+    CHECK(found->analysis.bandCorr[0]   == doctest::Approx(0.9f));
+    CHECK(found->analysis.overallCorr   == doctest::Approx(0.85f));
+}
+
+TEST_CASE("SqliteTrackRepository: find returns nullopt for unknown id") {
+    pb::Database db(":memory:");
+    pb::SqliteTrackRepository repo(db);
+    CHECK(!repo.find(pb::TrackId{"nope"}).has_value());
+}
+
+TEST_CASE("SqliteTrackRepository: findByPath") {
+    pb::Database db(":memory:");
+    pb::SqliteTrackRepository repo(db);
+
+    repo.save(makeSampleTrack("h1", "/music/a.wav"));
+    const auto found = repo.findByPath("/music/a.wav");
+    REQUIRE(found.has_value());
+    CHECK(found->id.hash == "h1");
+}
+
+TEST_CASE("SqliteTrackRepository: search by artist") {
+    pb::Database db(":memory:");
+    pb::SqliteTrackRepository repo(db);
+
+    auto t1 = makeSampleTrack("h1", "/a.wav"); t1.metadata.artist = "Beatles";
+    auto t2 = makeSampleTrack("h2", "/b.wav"); t2.metadata.artist = "Rolling Stones";
+    repo.save(t1);
+    repo.save(t2);
+
+    pb::TrackFilter filter;
+    filter.artist = "beatles";  // case-insensitive
+    const auto results = repo.search(filter);
+    REQUIRE(results.size() == 1);
+    CHECK(results[0].id.hash == "h1");
+}
+
+TEST_CASE("SqliteTrackRepository: search by artist AND genre") {
+    pb::Database db(":memory:");
+    pb::SqliteTrackRepository repo(db);
+
+    auto t1 = makeSampleTrack("h1"); t1.metadata.artist = "Metallica"; t1.metadata.genre = "Metal";
+    auto t2 = makeSampleTrack("h2", "/b.wav"); t2.metadata.artist = "Metallica"; t2.metadata.genre = "Rock";
+    repo.save(t1);
+    repo.save(t2);
+
+    pb::TrackFilter filter;
+    filter.artist = "metallica";
+    filter.genre  = "metal";
+    const auto results = repo.search(filter);
+    REQUIRE(results.size() == 1);
+    CHECK(results[0].id.hash == "h1");
+}
+
+TEST_CASE("SqliteTrackRepository: empty filter returns all tracks") {
+    pb::Database db(":memory:");
+    pb::SqliteTrackRepository repo(db);
+    repo.save(makeSampleTrack("h1", "/a.wav"));
+    repo.save(makeSampleTrack("h2", "/b.wav"));
+    CHECK(repo.search({}).size() == 2);
+}
+
+TEST_CASE("SqliteTrackRepository: remove") {
+    pb::Database db(":memory:");
+    pb::SqliteTrackRepository repo(db);
+    repo.save(makeSampleTrack("h1"));
+    repo.remove(pb::TrackId{"h1"});
+    CHECK(!repo.find(pb::TrackId{"h1"}).has_value());
+}
