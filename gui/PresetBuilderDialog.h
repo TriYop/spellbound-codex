@@ -4,6 +4,10 @@
 #include <memory>
 #include <string>
 
+QT_BEGIN_NAMESPACE
+class QTabWidget;
+QT_END_NAMESPACE
+
 namespace gui {
 
 class PresetBuilderCtx;
@@ -23,6 +27,12 @@ signals:
     // PresetSelector can refresh.
     void presetExported();
 
+protected:
+    void closeEvent(QCloseEvent* e) override;
+
+private slots:
+    void onIngesting(bool active);
+
 private:
     void buildUi();
     void onPresetExported();
@@ -30,6 +40,7 @@ private:
     std::string              execDir_;
     std::unique_ptr<PresetBuilderCtx> ctx_;
 
+    QTabWidget*      tabs_       = nullptr;
     IngestTab*       ingestTab_  = nullptr;
     BrowseTab*       browseTab_  = nullptr;
     CreatePresetTab* createTab_  = nullptr;

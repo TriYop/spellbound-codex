@@ -4,6 +4,7 @@
 #include "IngestTab.h"
 #include "PresetBuilderCtx.h"
 
+#include <QCloseEvent>
 #include <QDir>
 #include <QTabWidget>
 #include <QVBoxLayout>
@@ -34,17 +35,17 @@ void PresetBuilderDialog::buildUi() {
     auto* vbox = new QVBoxLayout(this);
     vbox->setContentsMargins(8, 8, 8, 8);
 
-    auto* tabs = new QTabWidget(this);
+    tabs_ = new QTabWidget(this);
 
     ingestTab_  = new IngestTab(*ctx_, this);
     browseTab_  = new BrowseTab(*ctx_, this);
     createTab_  = new CreatePresetTab(*ctx_, this);
 
-    tabs->addTab(ingestTab_,  "Ingest");
-    tabs->addTab(browseTab_,  "Browse / Tag");
-    tabs->addTab(createTab_,  "Create Preset");
+    tabs_->addTab(ingestTab_,  "Ingest");
+    tabs_->addTab(browseTab_,  "Browse / Tag");
+    tabs_->addTab(createTab_,  "Create Preset");
 
-    vbox->addWidget(tabs);
+    vbox->addWidget(tabs_);
 
     // Cross-tab wiring
     connect(ingestTab_,  &IngestTab::libraryChanged,
@@ -55,6 +56,8 @@ void PresetBuilderDialog::buildUi() {
             createTab_,  &CreatePresetTab::refreshTrackList);
     connect(createTab_,  &CreatePresetTab::presetExported,
             this,        &PresetBuilderDialog::onPresetExported);
+    connect(ingestTab_,  &IngestTab::ingesting,
+            this,        &PresetBuilderDialog::onIngesting);
 
     // Initial population
     browseTab_->refresh();
@@ -63,6 +66,18 @@ void PresetBuilderDialog::buildUi() {
 
 void PresetBuilderDialog::onPresetExported() {
     emit presetExported();
+}
+
+void PresetBuilderDialog::onIngesting(bool active) {
+    tabs_->setTabEnabled(1, !active);  // Browse / Tag
+    tabs_->setTabEnabled(2, !active);  // Create Preset
+}
+
+void PresetBuilderDialog::closeEvent(QCloseEvent* e) {
+    // Wait for any running ingest to complete before closing,
+    // to avoid use-after-free on ctx_ and the repositories.
+    if (ingestTab_) ingestTab_->waitForWorker();
+    QDialog::closeEvent(e);
 }
 
 } // namespace gui

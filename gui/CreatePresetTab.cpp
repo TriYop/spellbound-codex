@@ -188,7 +188,18 @@ CreatePresetTab::CreatePresetTab(PresetBuilderCtx& ctx, QWidget* parent)
 
 void CreatePresetTab::refreshTrackList() {
     displayedTracks_ = ctx_.tracks.search(currentFilter());
+
+    // Prune selectedHashes_ to remove any tracks deleted from the library.
+    std::set<std::string> validHashes;
+    for (const auto& t : ctx_.tracks.search({}))
+        validHashes.insert(t.id.hash);
+    std::set<std::string> pruned;
+    for (const auto& h : selectedHashes_)
+        if (validHashes.count(h)) pruned.insert(h);
+    selectedHashes_ = std::move(pruned);
+
     populateTrackTable(displayedTracks_);
+    updateExportButtons();
 }
 
 pb::TrackFilter CreatePresetTab::currentFilter() const {

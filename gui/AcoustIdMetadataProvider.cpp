@@ -61,7 +61,12 @@ AcoustIdMetadataProvider::queryAcoustId(const Fingerprint& fp) {
     timer.start(5000);
     loop.exec();
 
-    if (!reply->isFinished() || reply->error() != QNetworkReply::NoError) {
+    if (!reply->isFinished()) {
+        reply->abort();
+        reply->deleteLater();
+        return std::nullopt;
+    }
+    if (reply->error() != QNetworkReply::NoError) {
         reply->deleteLater();
         return std::nullopt;
     }

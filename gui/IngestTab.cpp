@@ -114,6 +114,7 @@ void IngestTab::startIngest(const std::string& path) {
     errorList_->clear();
     errorList_->hide();
     setRunning(true);
+    emit ingesting(true);
     worker_->setup(path, ctx_.tracks, ctx_.metadata);
     worker_->start();
 }
@@ -125,6 +126,7 @@ void IngestTab::onProgress(float fraction, const QString& stage) {
 
 void IngestTab::onFinished(pb::IngestReport report) {
     setRunning(false);
+    emit ingesting(false);
     addedLbl_->setText(  QString("Added: %1").arg(report.added));
     skippedLbl_->setText(QString("Skipped: %1").arg(report.skipped));
     failedLbl_->setText( QString("Failed: %1").arg(report.failed));
@@ -144,5 +146,8 @@ void IngestTab::setRunning(bool running) {
     stageLabel_->setVisible(running);
     if (running) progressBar_->setValue(0);
 }
+
+bool IngestTab::isWorkerRunning() const { return worker_->isRunning(); }
+void IngestTab::waitForWorker()          { if (worker_->isRunning()) worker_->wait(); }
 
 } // namespace gui

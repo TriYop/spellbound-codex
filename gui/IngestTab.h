@@ -52,8 +52,13 @@ class IngestTab : public QWidget {
 public:
     explicit IngestTab(PresetBuilderCtx& ctx, QWidget* parent = nullptr);
 
+public:
+    bool isWorkerRunning() const;
+    void waitForWorker();
+
 signals:
     void libraryChanged();
+    void ingesting(bool active);
 
 protected:
     void dragEnterEvent(QDragEnterEvent* e) override;
