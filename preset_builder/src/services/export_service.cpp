@@ -10,6 +10,10 @@ namespace pb {
 
 namespace {
 
+static constexpr std::array<const char*, 7> kBandAttr = {
+    "sub", "lows", "lomid", "mids", "himid", "highs", "air"
+};
+
 std::string xmlEscape(const std::string& s) {
     std::string r;
     r.reserve(s.size());
@@ -25,13 +29,14 @@ std::string xmlEscape(const std::string& s) {
     return r;
 }
 
-std::string formatBand(const std::array<float, 7>& v) {
+std::string formatBandElem(const char* elemName, const std::array<float, 7>& v) {
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(4);
-    for (int i = 0; i < 7; ++i) {
-        if (i > 0) oss << ' ';
-        oss << v[static_cast<size_t>(i)];
-    }
+    oss << "  <" << elemName;
+    for (int i = 0; i < 7; ++i)
+        oss << ' ' << kBandAttr[static_cast<size_t>(i)]
+            << "=\"" << v[static_cast<size_t>(i)] << '"';
+    oss << "/>\n";
     return oss.str();
 }
 
@@ -43,18 +48,18 @@ void ExportService::exportXml(const Preset& preset,
     std::ofstream out(outputPath);
     if (!out) throw std::runtime_error("ExportService: cannot write to " + outputPath);
 
+    out << std::fixed << std::setprecision(4);
     out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    out << "<preset"
+    out << "<MixAdvicePreset"
         << " name=\""        << xmlEscape(preset.name)        << "\""
         << " description=\"" << xmlEscape(preset.description) << "\""
         << ">\n";
-    out << std::fixed << std::setprecision(4);
-    out << "  <bandRmsDb>"       << formatBand(stats.bandRmsDb)       << "</bandRmsDb>\n";
-    out << "  <bandMinCorr>"     << formatBand(stats.bandCorrMin)     << "</bandMinCorr>\n";
-    out << "  <bandTransientDb>" << formatBand(stats.bandTransientDb) << "</bandTransientDb>\n";
-    out << "  <overallRmsDb>"    << stats.overallRmsDb                << "</overallRmsDb>\n";
-    out << "  <overallMinCorr>"  << stats.overallCorrMin              << "</overallMinCorr>\n";
-    out << "</preset>\n";
+    out << formatBandElem("BandRmsDb",       stats.bandRmsDb);
+    out << formatBandElem("BandMinCorr",     stats.bandCorrMin);
+    out << formatBandElem("BandTransientDb", stats.bandTransientDb);
+    out << "  <Overall rmsDb=\""  << stats.overallRmsDb
+        << "\" minCorr=\"" << stats.overallCorrMin << "\"/>\n";
+    out << "</MixAdvicePreset>\n";
 }
 
 } // namespace pb

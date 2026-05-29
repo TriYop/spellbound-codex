@@ -19,6 +19,7 @@ namespace pb {
 
 static std::string sha256File(const std::string& path) {
     std::ifstream ifs(path, std::ios::binary);
+    if (!ifs) throw std::runtime_error("sha256File: cannot open '" + path + "'");
     std::vector<unsigned char> hash(picosha2::k_digest_size);
     picosha2::hash256(ifs, hash.begin(), hash.end());
     return picosha2::bytes_to_hex_string(hash.begin(), hash.end());
@@ -27,8 +28,10 @@ static std::string sha256File(const std::string& path) {
 static std::string utcNow() {
     const auto now = std::chrono::system_clock::now();
     const std::time_t t = std::chrono::system_clock::to_time_t(now);
+    std::tm tm_buf{};
+    gmtime_r(&t, &tm_buf);
     std::ostringstream oss;
-    oss << std::put_time(std::gmtime(&t), "%Y-%m-%dT%H:%M:%SZ");
+    oss << std::put_time(&tm_buf, "%Y-%m-%dT%H:%M:%SZ");
     return oss.str();
 }
 
@@ -46,7 +49,8 @@ static TrackAnalysis toTrackAnalysis(const mt::AnalysisSnapshot& snap) {
 }
 
 static bool isAudioExtension(const fs::path& p) {
-    const std::string ext = p.extension().string();
+    std::string ext = p.extension().string();
+    for (char& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return ext == ".wav" || ext == ".flac" || ext == ".aiff" || ext == ".aif";
 }
 

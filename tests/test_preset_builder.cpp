@@ -88,6 +88,7 @@ TEST_CASE("StatsService::compute four tracks: even-n median averages two middles
 }
 
 #include "preset_builder/services/export_service.hpp"
+#include "mastertweak/preset.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -125,12 +126,14 @@ TEST_CASE("ExportService::exportXml writes MixAdvice-compatible XML") {
 
     CHECK(xml.find("name=\"Test Preset\"")             != std::string::npos);
     CHECK(xml.find("description=\"Unit test preset\"") != std::string::npos);
-    CHECK(xml.find("<bandRmsDb>")                      != std::string::npos);
-    CHECK(xml.find("<bandMinCorr>")                    != std::string::npos);
-    CHECK(xml.find("<bandTransientDb>")                != std::string::npos);
-    CHECK(xml.find("<overallRmsDb>")                   != std::string::npos);
-    CHECK(xml.find("<overallMinCorr>")                 != std::string::npos);
-    CHECK(xml.find("-20.")                             != std::string::npos);
+    CHECK(xml.find("<MixAdvicePreset")                 != std::string::npos);
+    CHECK(xml.find("<BandRmsDb")                       != std::string::npos);
+    CHECK(xml.find("<BandMinCorr")                     != std::string::npos);
+    CHECK(xml.find("<BandTransientDb")                 != std::string::npos);
+    CHECK(xml.find("<Overall")                         != std::string::npos);
+    CHECK(xml.find("rmsDb=")                           != std::string::npos);
+    CHECK(xml.find("minCorr=")                         != std::string::npos);
+    CHECK(xml.find("sub=\"-20.")                       != std::string::npos);
 }
 
 TEST_CASE("ExportService::exportXml: XML special chars in name are escaped") {
@@ -149,6 +152,33 @@ TEST_CASE("ExportService::exportXml: XML special chars in name are escaped") {
 
     CHECK(xml.find("&amp;")  != std::string::npos);
     CHECK(xml.find("&quot;") != std::string::npos);
+}
+
+TEST_CASE("ExportService::exportXml round-trips through mt::loadPreset") {
+    pb::Preset preset;
+    preset.name        = "RoundTripTest";
+    preset.description = "verifies schema compatibility";
+
+    pb::PresetStats stats;
+    stats.bandRmsDb       = {-20.f, -18.f, -16.f, -14.f, -12.f, -10.f, -8.f};
+    stats.bandCorrMin     = {0.9f, 0.8f, 0.7f, 0.6f, 0.5f, 0.4f, 0.3f};
+    stats.bandTransientDb = {6.f, 5.f, 4.f, 3.f, 2.f, 1.f, 0.f};
+    stats.overallRmsDb    = -18.f;
+    stats.overallCorrMin  =  0.7f;
+
+    const auto tmp = (fs_pb::temp_directory_path() / "pb_roundtrip.xml").string();
+    pb::ExportService svc;
+    svc.exportXml(preset, stats, tmp);
+
+    std::string err;
+    const auto loaded = mt::loadPreset(tmp, &err);
+    fs_pb::remove(tmp);
+
+    REQUIRE_MESSAGE(loaded.has_value(), err);
+    CHECK(loaded->name        == "RoundTripTest");
+    CHECK(loaded->overallRmsDb == doctest::Approx(-18.f));
+    CHECK(loaded->bandRmsDb[0] == doctest::Approx(-20.f));
+    CHECK(loaded->bandMinCorr[0] == doctest::Approx(0.9f));
 }
 
 #include "preset_builder/services/ingest_service.hpp"

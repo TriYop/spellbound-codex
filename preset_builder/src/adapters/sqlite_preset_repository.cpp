@@ -9,10 +9,14 @@ SqlitePresetRepository::SqlitePresetRepository(Database& db) : db_(db) {}
 
 static Preset stmtToPreset(sqlite3_stmt* st) {
     Preset p;
-    p.id.uuid     = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
-    p.name        = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
-    p.description = reinterpret_cast<const char*>(sqlite3_column_text(st, 2));
-    p.createdAt   = reinterpret_cast<const char*>(sqlite3_column_text(st, 3));
+    auto col = [&](int i) -> std::string {
+        const unsigned char* v = sqlite3_column_text(st, i);
+        return v ? reinterpret_cast<const char*>(v) : "";
+    };
+    p.id.uuid     = col(0);
+    p.name        = col(1);
+    p.description = col(2);
+    p.createdAt   = col(3);
     return p;
 }
 
