@@ -2,6 +2,7 @@ qt_add_executable(MasterTweak
     main.cpp
     MainWindow.h
     MainWindow.cpp
+    utils.h
     AudioControl.h
     AudioControl.cpp
     RotaryKnob.h
@@ -18,13 +19,26 @@ qt_add_executable(MasterTweak
     TargetLevelCombo.cpp
     VUMeterWidget.h
     VUMeterWidget.cpp
+    AcoustIdMetadataProvider.h
+    AcoustIdMetadataProvider.cpp
+    PresetBuilderCtx.h
+    PresetBuilderDialog.h
+    PresetBuilderDialog.cpp
+    IngestTab.h
+    IngestTab.cpp
+    BrowseTab.h
+    BrowseTab.cpp
+    CreatePresetTab.h
+    CreatePresetTab.cpp
 )
 
 target_link_libraries(MasterTweak
     PRIVATE
         mastertweak_core
+        preset_builder_core
         Qt6::Core
         Qt6::Widgets
+        Qt6::Network
         miniaudio
 )
 

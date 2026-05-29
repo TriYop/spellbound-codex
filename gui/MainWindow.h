@@ -92,8 +92,6 @@ private:
     void startAnalysis();
     void setInputFile(const QString& path);
     QString makeDefaultOutputPath(bool flac) const;
-    static std::string sanitizePresetName(const std::string& name);
-
     // ── State ─────────────────────────────────────────────────────────────────
     QString                       inputPath_;
     QString                       renderedPath_;
