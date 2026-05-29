@@ -9,11 +9,13 @@ add_executable(mastertweak_tests
     test_pipeline.cpp
     test_target_level.cpp
     test_gain_stager.cpp
+    test_preset_builder.cpp
 )
 
 target_link_libraries(mastertweak_tests
     PRIVATE
         mastertweak_core
+        preset_builder_core
         doctest
 )
 
