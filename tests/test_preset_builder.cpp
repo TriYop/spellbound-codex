@@ -447,3 +447,80 @@ TEST_CASE("SqliteTrackRepository: remove") {
     repo.remove(pb::TrackId{"h1"});
     CHECK(!repo.find(pb::TrackId{"h1"}).has_value());
 }
+
+#include "preset_builder/adapters/sqlite_preset_repository.hpp"
+
+static pb::Preset makePreset(const std::string& uuid = "uuid-1",
+                              const std::string& name = "My Preset") {
+    pb::Preset p;
+    p.id          = pb::PresetId{uuid};
+    p.name        = name;
+    p.description = "Test description";
+    p.createdAt   = "2026-05-29T12:00:00Z";
+    return p;
+}
+
+TEST_CASE("SqlitePresetRepository: save and find by id") {
+    pb::Database db(":memory:");
+    pb::SqlitePresetRepository repo(db);
+
+    auto preset = makePreset("uuid-42", "Rock Preset");
+    repo.save(preset);
+
+    const auto found = repo.find(pb::PresetId{"uuid-42"});
+    REQUIRE(found.has_value());
+    CHECK(found->name        == "Rock Preset");
+    CHECK(found->description == "Test description");
+}
+
+TEST_CASE("SqlitePresetRepository: find returns nullopt for unknown id") {
+    pb::Database db(":memory:");
+    pb::SqlitePresetRepository repo(db);
+    CHECK(!repo.find(pb::PresetId{"missing"}).has_value());
+}
+
+TEST_CASE("SqlitePresetRepository: listAll") {
+    pb::Database db(":memory:");
+    pb::SqlitePresetRepository repo(db);
+    repo.save(makePreset("u1", "P1"));
+    repo.save(makePreset("u2", "P2"));
+    CHECK(repo.listAll().size() == 2);
+}
+
+TEST_CASE("SqlitePresetRepository: save stores trackIds and tracksFor returns them") {
+    pb::Database db(":memory:");
+    pb::SqliteTrackRepository  trackRepo(db);
+    pb::SqlitePresetRepository presetRepo(db);
+
+    auto t1 = makeSampleTrack("th1", "/a.wav");
+    auto t2 = makeSampleTrack("th2", "/b.wav");
+    trackRepo.save(t1);
+    trackRepo.save(t2);
+
+    pb::Preset preset = makePreset("p1");
+    preset.trackIds   = {pb::TrackId{"th1"}, pb::TrackId{"th2"}};
+    presetRepo.save(preset);
+
+    const auto tracks = presetRepo.tracksFor(pb::PresetId{"p1"});
+    REQUIRE(tracks.size() == 2);
+
+    const auto loaded = presetRepo.find(pb::PresetId{"p1"});
+    REQUIRE(loaded.has_value());
+    CHECK(loaded->trackIds.size() == 2);
+}
+
+TEST_CASE("SqlitePresetRepository: remove deletes preset and preset_tracks") {
+    pb::Database db(":memory:");
+    pb::SqliteTrackRepository  trackRepo(db);
+    pb::SqlitePresetRepository presetRepo(db);
+
+    trackRepo.save(makeSampleTrack("th1"));
+    pb::Preset p = makePreset("p1");
+    p.trackIds   = {pb::TrackId{"th1"}};
+    presetRepo.save(p);
+
+    presetRepo.remove(pb::PresetId{"p1"});
+
+    CHECK(!presetRepo.find(pb::PresetId{"p1"}).has_value());
+    CHECK(presetRepo.listAll().empty());
+}
