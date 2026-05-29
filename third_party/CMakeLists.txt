@@ -10,3 +10,6 @@ target_include_directories(cli11 INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/CLI11)
 
 add_library(doctest INTERFACE)
 target_include_directories(doctest INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/doctest)
+
+add_library(picosha2 INTERFACE)
+target_include_directories(picosha2 INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})

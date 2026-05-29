@@ -11,10 +11,12 @@ add_library(preset_builder_core STATIC
 
 target_include_directories(preset_builder_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/third_party
 )
 
-target_link_libraries(preset_builder_core PUBLIC
-    mastertweak_core
-    SQLite::SQLite3
+target_link_libraries(preset_builder_core
+    PUBLIC
+        mastertweak_core
+        SQLite::SQLite3
+    PRIVATE
+        picosha2
 )
