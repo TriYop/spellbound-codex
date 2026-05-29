@@ -86,3 +86,67 @@ TEST_CASE("StatsService::compute four tracks: even-n median averages two middles
 
     CHECK(stats.bandTransientDb[0] == doctest::Approx(6.f));
 }
+
+#include "preset_builder/services/export_service.hpp"
+
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <string>
+
+namespace fs_pb = std::filesystem;
+
+static std::string readFileStr(const std::string& path) {
+    std::ifstream in(path);
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
+}
+
+TEST_CASE("ExportService::exportXml writes MixAdvice-compatible XML") {
+    pb::Preset preset;
+    preset.name        = "Test Preset";
+    preset.description = "Unit test preset";
+
+    pb::PresetStats stats;
+    stats.bandRmsDb       = {-20.f, -18.f, -16.f, -14.f, -12.f, -10.f, -8.f};
+    stats.bandCorrMin     = {0.9f, 0.8f, 0.7f, 0.6f, 0.5f, 0.4f, 0.3f};
+    stats.bandTransientDb = {6.f, 5.f, 4.f, 3.f, 2.f, 1.f, 0.f};
+    stats.overallRmsDb    = -18.f;
+    stats.overallCorrMin  =  0.7f;
+
+    const auto tmp = (fs_pb::temp_directory_path() / "pb_test_export.xml").string();
+
+    pb::ExportService svc;
+    svc.exportXml(preset, stats, tmp);
+
+    const std::string xml = readFileStr(tmp);
+    fs_pb::remove(tmp);
+
+    CHECK(xml.find("name=\"Test Preset\"")             != std::string::npos);
+    CHECK(xml.find("description=\"Unit test preset\"") != std::string::npos);
+    CHECK(xml.find("<bandRmsDb>")                      != std::string::npos);
+    CHECK(xml.find("<bandMinCorr>")                    != std::string::npos);
+    CHECK(xml.find("<bandTransientDb>")                != std::string::npos);
+    CHECK(xml.find("<overallRmsDb>")                   != std::string::npos);
+    CHECK(xml.find("<overallMinCorr>")                 != std::string::npos);
+    CHECK(xml.find("-20.")                             != std::string::npos);
+}
+
+TEST_CASE("ExportService::exportXml: XML special chars in name are escaped") {
+    pb::Preset preset;
+    preset.name        = "Rock & Roll";
+    preset.description = "Test \"quotes\"";
+
+    pb::PresetStats stats;  // zero-filled
+
+    const auto tmp = (fs_pb::temp_directory_path() / "pb_test_escape.xml").string();
+    pb::ExportService svc;
+    svc.exportXml(preset, stats, tmp);
+
+    const std::string xml = readFileStr(tmp);
+    fs_pb::remove(tmp);
+
+    CHECK(xml.find("&amp;")  != std::string::npos);
+    CHECK(xml.find("&quot;") != std::string::npos);
+}
