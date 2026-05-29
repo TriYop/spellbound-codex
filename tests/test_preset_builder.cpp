@@ -55,8 +55,6 @@ TEST_CASE("StatsService::compute single track: stats equal track values") {
 TEST_CASE("StatsService::compute three tracks: mean, p10, median") {
     StatsService svc;
 
-    std::array<float, 7> z{};
-
     // bandRmsDb band0: mean of -20, -18, -16 = -18
     // bandCorr  band0: p10 of 0.3, 0.5, 0.8 → sorted[floor(0.1*3)=0] = 0.3
     // bandTrans band0: median of 5, 3, 7 → sorted[3,5,7] middle = 5
