@@ -150,3 +150,39 @@ TEST_CASE("ExportService::exportXml: XML special chars in name are escaped") {
     CHECK(xml.find("&amp;")  != std::string::npos);
     CHECK(xml.find("&quot;") != std::string::npos);
 }
+
+#include "preset_builder/services/ingest_service.hpp"
+
+TEST_CASE("IngestService::parseFilenameMetadata: 'Artist - Title.wav'") {
+    auto m = pb::IngestService::parseFilenameMetadata("The Artist - My Song.wav");
+    REQUIRE(m.artist.has_value());
+    REQUIRE(m.title.has_value());
+    CHECK(*m.artist == "The Artist");
+    CHECK(*m.title  == "My Song");
+    CHECK(m.source  == pb::MetadataSource::filename);
+}
+
+TEST_CASE("IngestService::parseFilenameMetadata: em-dash separator") {
+    // UTF-8 em-dash: 0xE2 0x80 0x93
+    auto m = pb::IngestService::parseFilenameMetadata("DJ Name \xe2\x80\x93 Track Name.flac");
+    REQUIRE(m.artist.has_value());
+    REQUIRE(m.title.has_value());
+    CHECK(*m.artist == "DJ Name");
+    CHECK(*m.title  == "Track Name");
+}
+
+TEST_CASE("IngestService::parseFilenameMetadata: no separator gives title only") {
+    auto m = pb::IngestService::parseFilenameMetadata("MySong.aiff");
+    CHECK(!m.artist.has_value());
+    REQUIRE(m.title.has_value());
+    CHECK(*m.title == "MySong");
+    CHECK(m.source == pb::MetadataSource::filename);
+}
+
+TEST_CASE("IngestService::parseFilenameMetadata: full path is handled") {
+    auto m = pb::IngestService::parseFilenameMetadata("/home/user/music/Artist - Song.wav");
+    REQUIRE(m.artist.has_value());
+    CHECK(*m.artist == "Artist");
+    REQUIRE(m.title.has_value());
+    CHECK(*m.title == "Song");
+}
