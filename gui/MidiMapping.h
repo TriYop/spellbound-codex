@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cmath>
 
 namespace gui {
@@ -27,7 +28,7 @@ struct CcBinding {
 };
 
 struct NoteBinding {
-    int note    = -1;  // -1 = unbound
+    int note    = -1;  // MIDI note number, OR CC# for CC-based transport (e.g. nanoKONTROL2); -1 = unbound
     int channel = -1;  // -1 = any channel
 };
 
@@ -36,15 +37,21 @@ struct MidiMap {
     std::array<NoteBinding, 2>                 noteBindings{};  // [0]=Play [1]=Stop
 
     CcBinding& ccFor(MidiParam p) {
+        assert(static_cast<int>(p) < kMidiParamCcCount && "ccFor: param is not CC-controlled");
         return ccBindings[static_cast<int>(p)];
     }
     const CcBinding& ccFor(MidiParam p) const {
+        assert(static_cast<int>(p) < kMidiParamCcCount && "ccFor: param is not CC-controlled");
         return ccBindings[static_cast<int>(p)];
     }
     NoteBinding& noteFor(MidiParam p) {
+        assert(static_cast<int>(p) >= kMidiParamCcCount && static_cast<int>(p) < kMidiParamCount
+               && "noteFor: param is not Note-controlled");
         return noteBindings[static_cast<int>(p) - kMidiParamCcCount];
     }
     const NoteBinding& noteFor(MidiParam p) const {
+        assert(static_cast<int>(p) >= kMidiParamCcCount && static_cast<int>(p) < kMidiParamCount
+               && "noteFor: param is not Note-controlled");
         return noteBindings[static_cast<int>(p) - kMidiParamCcCount];
     }
 
