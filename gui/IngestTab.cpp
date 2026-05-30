@@ -27,6 +27,11 @@ void IngestWorker::setup(const std::string& path,
     path_ = path;
     repo_ = &repo;
     meta_ = &meta;
+    cancelled_.store(false, std::memory_order_relaxed);
+}
+
+void IngestWorker::requestStop() {
+    cancelled_.store(true, std::memory_order_relaxed);
 }
 
 void IngestWorker::run() {
@@ -34,7 +39,8 @@ void IngestWorker::run() {
     auto report = svc.ingest(path_, *repo_, *meta_,
         [this](float f, const std::string& s) {
             emit progress(f, QString::fromStdString(s));
-        });
+        },
+        &cancelled_);
     emit finished(std::move(report));
 }
 
@@ -50,13 +56,21 @@ IngestTab::IngestTab(PresetBuilderCtx& ctx, QWidget* parent)
 
     // ── Input row ────────────────────────────────────────────────────────────
     {
-        auto* row = new QHBoxLayout;
-        addBtn_   = new QPushButton("Add folder\xe2\x80\xa6", this);
+        auto* row  = new QHBoxLayout;
+        addBtn_    = new QPushButton("Add folder\xe2\x80\xa6", this);
+        stopBtn_   = new QPushButton("Stop", this);
+        stopBtn_->setEnabled(false);
+        stopBtn_->hide();
         dropLabel_ = new QLabel("  or drop a folder / files here", this);
         dropLabel_->setStyleSheet(
             "border: 2px dashed #888; border-radius: 4px; padding: 6px; color: #555;");
-        connect(addBtn_, &QPushButton::clicked, this, &IngestTab::onAddFolder);
+        connect(addBtn_,  &QPushButton::clicked, this, &IngestTab::onAddFolder);
+        connect(stopBtn_, &QPushButton::clicked, this, [this] {
+            stopBtn_->setEnabled(false);
+            worker_->requestStop();
+        });
         row->addWidget(addBtn_);
+        row->addWidget(stopBtn_);
         row->addWidget(dropLabel_, 1);
         vbox->addLayout(row);
     }
@@ -127,7 +141,7 @@ void IngestTab::onProgress(float fraction, const QString& stage) {
 void IngestTab::onFinished(pb::IngestReport report) {
     setRunning(false);
     emit ingesting(false);
-    addedLbl_->setText(  QString("Added: %1").arg(report.added));
+    addedLbl_->setText(  QString(report.cancelled ? "Added: %1 (stopped)" : "Added: %1").arg(report.added));
     skippedLbl_->setText(QString("Skipped: %1").arg(report.skipped));
     failedLbl_->setText( QString("Failed: %1").arg(report.failed));
 
@@ -137,11 +151,13 @@ void IngestTab::onFinished(pb::IngestReport report) {
             errorList_->addItem(QString::fromStdString(p + ": " + msg));
     }
 
-    if (report.added > 0) emit libraryChanged();
+    emit libraryChanged();
 }
 
 void IngestTab::setRunning(bool running) {
     addBtn_->setEnabled(!running);
+    stopBtn_->setVisible(running);
+    stopBtn_->setEnabled(running);
     progressBar_->setVisible(running);
     stageLabel_->setVisible(running);
     if (running) progressBar_->setValue(0);

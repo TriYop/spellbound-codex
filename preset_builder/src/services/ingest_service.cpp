@@ -101,7 +101,8 @@ TrackMetadata IngestService::parseFilenameMetadata(const std::string& filePath) 
 IngestReport IngestService::ingest(const std::string& path,
                                    TrackRepository&   repo,
                                    MetadataProvider&  metaProvider,
-                                   mt::ProgressCallback progress) const {
+                                   mt::ProgressCallback progress,
+                                   std::atomic<bool>* cancel) const {
     IngestReport report;
     const auto files = collectAudioFiles(path);
     if (files.empty()) {
@@ -180,6 +181,7 @@ IngestReport IngestService::ingest(const std::string& path,
     // (unexpected throws from repo/provider must not escape std::thread).
     auto workerFn = [&]() noexcept {
         while (true) {
+            if (cancel && cancel->load(std::memory_order_relaxed)) break;
             const size_t i = nextIndex.fetch_add(1, std::memory_order_relaxed);
             if (i >= files.size()) break;
             try {
@@ -202,7 +204,10 @@ IngestReport IngestService::ingest(const std::string& path,
         threads.emplace_back(workerFn);
     for (auto& t : threads) t.join();
 
-    if (progress) progress(1.f, "Done");
+    if (cancel && cancel->load(std::memory_order_relaxed))
+        report.cancelled = true;
+
+    if (progress) progress(1.f, report.cancelled ? "Cancelled" : "Done");
     return report;
 }
 

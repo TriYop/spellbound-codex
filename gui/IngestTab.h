@@ -4,6 +4,7 @@
 
 #include <QThread>
 #include <QWidget>
+#include <atomic>
 #include <string>
 
 namespace gui {
@@ -31,6 +32,7 @@ public:
     void setup(const std::string& path,
                pb::TrackRepository& repo,
                pb::MetadataProvider& meta);
+    void requestStop();
 
 signals:
     void progress(float fraction, const QString& stage);
@@ -43,6 +45,7 @@ private:
     std::string           path_;
     pb::TrackRepository*  repo_ = nullptr;
     pb::MetadataProvider* meta_ = nullptr;
+    std::atomic<bool>     cancelled_{false};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,6 +80,7 @@ private:
     IngestWorker*     worker_    = nullptr;
 
     QPushButton*  addBtn_        = nullptr;
+    QPushButton*  stopBtn_       = nullptr;
     QLabel*       dropLabel_     = nullptr;
     QProgressBar* progressBar_   = nullptr;
     QLabel*       stageLabel_    = nullptr;
