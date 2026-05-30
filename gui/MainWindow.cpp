@@ -2,6 +2,7 @@
 #include "AudioControl.h"
 #include "ChainPanel.h"
 #include "MidiController.h"
+#include "MidiSettingsDialog.h"
 #include "PresetBuilderDialog.h"
 #include "PresetSelector.h"
 #include "RotaryKnob.h"
@@ -243,7 +244,11 @@ void MainWindow::buildUi() {
     // ── MIDI menu ─────────────────────────────────────────────────────────────
     auto* midiMenu = menuBar()->addMenu("MIDI");
     midiSettingsAction_ = midiMenu->addAction(QString::fromUtf8("MIDI Settings\xe2\x80\xa6"));
-    midiSettingsAction_->setEnabled(false);  // enabled in Task 7 when dialog is wired
+    connect(midiSettingsAction_, &QAction::triggered, this, [this] {
+        MidiSettingsDialog dlg(midi_, this);
+        dlg.exec();
+    });
+    midiSettingsAction_->setEnabled(true);
 }
 
 void MainWindow::onOpenFile() {

@@ -18,4 +18,4 @@
 
 - ~~Ingest files in parallel, up to the number of available CPU cores~~ **DONE** — `IngestService` thread pool (`std::thread::hardware_concurrency()` workers); hash/decode/analyse runs lock-free, SQLite and MetadataProvider serialised behind a single `std::mutex`.
 
-- I would love to control my knobs, faders, transport and switches from my MIDI control surface (korg nanokontrol 2 ; behringer X-Touch Mini (in GM Mode)). Viewing the knobs values directly on the control surface would also be great
+- ~~I would love to control my knobs, faders, transport and switches from my MIDI control surface (korg nanokontrol 2 ; behringer X-Touch Mini (in GM Mode)). Viewing the knobs values directly on the control surface would also be great~~ **DONE** — `MidiController` (RtMidi 6.0.0/ALSA), `MidiMapping` (nanoKONTROL2 + X-Touch Mini GM defaults), bidirectional CC feedback, `MidiSettingsDialog` with QSettings persistence and startup auto-reconnect.

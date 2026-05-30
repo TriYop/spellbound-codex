@@ -32,6 +32,9 @@ qt_add_executable(MasterTweak
     CreatePresetTab.cpp
     MidiController.h
     MidiController.cpp
+    MidiMapping.h
+    MidiSettingsDialog.h
+    MidiSettingsDialog.cpp
 )
 
 target_link_libraries(MasterTweak
