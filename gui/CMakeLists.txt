@@ -30,6 +30,8 @@ qt_add_executable(MasterTweak
     BrowseTab.cpp
     CreatePresetTab.h
     CreatePresetTab.cpp
+    MidiController.h
+    MidiController.cpp
 )
 
 target_link_libraries(MasterTweak
