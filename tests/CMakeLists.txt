@@ -11,6 +11,7 @@ add_executable(mastertweak_tests
     test_gain_stager.cpp
     test_preset_builder.cpp
     test_codec_correction.cpp
+    test_midi_mapping.cpp
 )
 
 target_link_libraries(mastertweak_tests
