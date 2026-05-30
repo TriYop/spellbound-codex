@@ -44,6 +44,13 @@ public:
     // Reset to pre-analysis state: default values, "—" readouts.
     void clear();
 
+    // Accessors for MIDI wiring — do not call before setAdvice() has been called.
+    VerticalFader* eqGainFader(int band)  const;
+    RotaryKnob*    satDriveKnob()         const;
+    RotaryKnob*    mixbusThreshKnob()     const;
+    RotaryKnob*    mixbusMakeupKnob()     const;
+    VerticalFader* limCeilingFader()      const;
+
 signals:
     // Emitted when any control value or bypass checkbox changes.
     void overrideChanged(const mt::AdviceSet& advice);

@@ -23,6 +23,8 @@ public:
     void   setSingleStep(double step);
     void   setClean(double baseline);   // dirty dot shown when value ≠ baseline
     void   setSuffix(const QString& s); // e.g. " dB", " dBTP"
+    double minimum() const { return minVal_; }
+    double maximum() const { return maxVal_; }
 
 signals:
     void valueChanged(double value);

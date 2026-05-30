@@ -331,4 +331,10 @@ void ChainPanel::clear() {
     limPeakLbl_->setText(dash);
 }
 
+VerticalFader* ChainPanel::eqGainFader(int band)  const { return eqGainFaders_[band]; }
+RotaryKnob*    ChainPanel::satDriveKnob()          const { return satDriveKnob_; }
+RotaryKnob*    ChainPanel::mixbusThreshKnob()      const { return mixbusThreshKnob_; }
+RotaryKnob*    ChainPanel::mixbusMakeupKnob()      const { return mixbusMakeupKnob_; }
+VerticalFader* ChainPanel::limCeilingFader()       const { return limCeilingFader_; }
+
 } // namespace gui
