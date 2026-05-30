@@ -16,4 +16,6 @@
   - ~~Sub-project B: Qt6 Preset Builder dialog (Ingest / Browse+Tag / Create Preset screens)~~ **DONE**
   - ~~Sub-project C: MP3 / OGG ingest with FFT-based spectral rolloff correction~~ **DONE** — `computeCodecCorrection()` in `mastertweak_core`; Air (±6 dB), Highs (±1.5 dB), HiMids (±0.5 dB); baked into `bandRmsDb` before DB write.
 
+- ~~Ingest files in parallel, up to the number of available CPU cores~~ **DONE** — `IngestService` thread pool (`std::thread::hardware_concurrency()` workers); hash/decode/analyse runs lock-free, SQLite and MetadataProvider serialised behind a single `std::mutex`.
+
 - I would love to control my knobs, faders, transport and switches from my MIDI control surface (korg nanokontrol 2 ; behringer X-Touch Mini (in GM Mode)). Viewing the knobs values directly on the control surface would also be great
