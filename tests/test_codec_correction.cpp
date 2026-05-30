@@ -144,8 +144,8 @@ TEST_CASE("computeCodecCorrection: white noise (flat spectrum) → small Air cor
     const auto corr = mt::computeCodecCorrection(af);
     // White noise has similar energy at all frequencies → Air correction should be small
     CHECK(corr[6] < 2.f);   // at most 2 dB variance from flat
-    CHECK(corr[5] < 1.5f);  // upper Highs: within clamp
-    CHECK(corr[4] < 0.5f);  // HiMids: within clamp
+    CHECK(corr[5] < 0.3f);  // upper Highs: near-zero on flat spectrum
+    CHECK(corr[4] < 0.05f); // HiMids: near-zero on flat spectrum
     // Low bands: always 0
     for (size_t i = 0; i < 4; ++i)
         CHECK(corr[i] == 0.f);
@@ -156,7 +156,7 @@ TEST_CASE("computeCodecCorrection: corrections are always non-negative") {
     // correction must be clamped at 0 — we never subtract.
     auto af = makeMono(44100, 2.f);
     // Strong HF content — add sines above 16 kHz, weak content at 8-12 kHz
-    addSine(af, 8000.f, 0.01f);
+    addSine(af, 8000.f, 0.1f);   // strong enough baseline to clear the -50 dBFS guard
     addSine(af, 17000.f, 0.5f);
     addSine(af, 19000.f, 0.5f);
 
