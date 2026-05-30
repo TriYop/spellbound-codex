@@ -1,6 +1,7 @@
 #include "preset_builder/services/ingest_service.hpp"
 
 #include "mastertweak/analysis.hpp"
+#include "mastertweak/codec_correction.hpp"
 #include "mastertweak/io.hpp"
 
 #include "picosha2.h"
@@ -51,7 +52,8 @@ static TrackAnalysis toTrackAnalysis(const mt::AnalysisSnapshot& snap) {
 static bool isAudioExtension(const fs::path& p) {
     std::string ext = p.extension().string();
     for (char& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return ext == ".wav" || ext == ".flac" || ext == ".aiff" || ext == ".aif";
+    return ext == ".wav"  || ext == ".flac" || ext == ".aiff" || ext == ".aif"
+        || ext == ".mp3"  || ext == ".ogg"  || ext == ".oga";
 }
 
 static std::vector<fs::path> collectAudioFiles(const std::string& root) {
@@ -132,8 +134,16 @@ IngestReport IngestService::ingest(const std::string& path,
             report.errors.emplace_back(filePath, "Read failed: " + err);
             continue;
         }
-        const auto snap     = mt::analyseFile(*audio);
-        const auto analysis = toTrackAnalysis(snap);
+        const auto snap = mt::analyseFile(*audio);
+        auto analysis   = toTrackAnalysis(snap);
+
+        // Boost per-band RMS to compensate for lossy codec rolloff
+        if (audio->sourceFormat == mt::SourceFormat::mp3 ||
+            audio->sourceFormat == mt::SourceFormat::ogg) {
+            const auto corr = mt::computeCodecCorrection(*audio);
+            for (size_t j = 0; j < 7; ++j)
+                analysis.bandRmsDb[j] += corr[j];
+        }
 
         // 4. Metadata (provider → filename fallback)
         auto meta = metaProvider.lookup(filePath);
