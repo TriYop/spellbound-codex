@@ -6,6 +6,7 @@ add_library(mastertweak_core STATIC
     src/advice.cpp
     src/pipeline.cpp
     src/target_level.cpp
+    src/codec_correction.cpp
     src/dsp/linkwitz_riley.cpp
     src/dsp/parametric_eq.cpp
     src/dsp/compressor.cpp
