@@ -27,16 +27,27 @@ std::optional<AudioFile> readAudioFile(const std::string& path, std::string* err
     else if (subtype == SF_FORMAT_PCM_32 || subtype == SF_FORMAT_FLOAT) out.bitDepth = 32;
     else                                  out.bitDepth = 24;  // sensible default
 
+    // Determine container before reading so we know whether a short read is fatal.
+    // MP3/OGG: libsndfile reports an estimated frame count; actual decoded frames may differ.
+    const int  major    = info.format & SF_FORMAT_TYPEMASK;
+    const bool isLossy  = (major == SF_FORMAT_MPEG || major == SF_FORMAT_OGG);
+
     // Read interleaved, then deinterleave
     const int totalSamples = out.numFrames * out.numChannels;
     std::vector<float> interleaved(static_cast<size_t>(totalSamples));
     const sf_count_t read = sf_read_float(sf, interleaved.data(), totalSamples);
     sf_close(sf);
 
-    if (read != totalSamples) {
-        if (errOut) *errOut = "Short read: expected " + std::to_string(totalSamples) +
-                              " samples, got " + std::to_string(read);
-        return std::nullopt;
+    if (read != static_cast<sf_count_t>(totalSamples)) {
+        if (isLossy && read > 0) {
+            // Frame-count mismatch is normal for lossy formats — truncate to what was decoded.
+            interleaved.resize(static_cast<size_t>(read));
+            out.numFrames = static_cast<int>(read) / out.numChannels;
+        } else {
+            if (errOut) *errOut = "Short read: expected " + std::to_string(totalSamples) +
+                                  " samples, got " + std::to_string(read);
+            return std::nullopt;
+        }
     }
 
     out.samples.resize(static_cast<size_t>(out.numChannels),
@@ -46,7 +57,6 @@ std::optional<AudioFile> readAudioFile(const std::string& path, std::string* err
             out.samples[static_cast<size_t>(c)][static_cast<size_t>(f)] =
                 interleaved[static_cast<size_t>(f * out.numChannels + c)];
 
-    const int major = info.format & SF_FORMAT_TYPEMASK;
     if      (major == SF_FORMAT_WAV   || major == SF_FORMAT_WAVEX) out.sourceFormat = SourceFormat::wav;
     else if (major == SF_FORMAT_AIFF)  out.sourceFormat = SourceFormat::aiff;
     else if (major == SF_FORMAT_FLAC)  out.sourceFormat = SourceFormat::flac;

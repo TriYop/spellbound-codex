@@ -40,7 +40,10 @@ void IngestWorker::run() {
         [this](float f, const std::string& s) {
             emit progress(f, QString::fromStdString(s));
         },
-        &cancelled_);
+        &cancelled_,
+        [this](const std::string& p, const std::string& msg) {
+            emit fileError(QString::fromStdString(p), QString::fromStdString(msg));
+        });
     emit finished(std::move(report));
 }
 
@@ -104,8 +107,9 @@ IngestTab::IngestTab(PresetBuilderCtx& ctx, QWidget* parent)
     vbox->addStretch();
 
     worker_ = new IngestWorker(this);
-    connect(worker_, &IngestWorker::progress, this, &IngestTab::onProgress);
-    connect(worker_, &IngestWorker::finished, this, &IngestTab::onFinished);
+    connect(worker_, &IngestWorker::progress,  this, &IngestTab::onProgress);
+    connect(worker_, &IngestWorker::fileError, this, &IngestTab::onFileError);
+    connect(worker_, &IngestWorker::finished,  this, &IngestTab::onFinished);
 }
 
 void IngestTab::dragEnterEvent(QDragEnterEvent* e) {
@@ -136,6 +140,11 @@ void IngestTab::startIngest(const std::string& path) {
 void IngestTab::onProgress(float fraction, const QString& stage) {
     progressBar_->setValue(static_cast<int>(fraction * 100.f));
     stageLabel_->setText(stage);
+}
+
+void IngestTab::onFileError(const QString& path, const QString& msg) {
+    if (errorList_->isHidden()) errorList_->show();
+    errorList_->addItem(path + ": " + msg);
 }
 
 void IngestTab::onFinished(pb::IngestReport report) {

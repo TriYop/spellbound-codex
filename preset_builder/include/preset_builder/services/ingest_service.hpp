@@ -6,6 +6,7 @@
 #include "mastertweak/pipeline.hpp"
 
 #include <atomic>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -26,11 +27,14 @@ public:
     // Falls back to parseFilenameMetadata() when MetadataProvider returns nullopt.
     // Pass a non-null cancel pointer to support cooperative cancellation: the
     // worker threads check it between files and stop as soon as it is true.
+    using ErrorCallback = std::function<void(const std::string& path, const std::string& msg)>;
+
     IngestReport ingest(const std::string& path,
                         TrackRepository&   repo,
                         MetadataProvider&  metadata,
-                        mt::ProgressCallback  progress = {},
-                        std::atomic<bool>* cancel   = nullptr) const;
+                        mt::ProgressCallback progress  = {},
+                        std::atomic<bool>*   cancel    = nullptr,
+                        ErrorCallback        onError   = {}) const;
 
     // Extract artist and title from a filename (stem only, path prefix stripped).
     // Splits on " - " or " \xe2\x80\x93 " (UTF-8 en-dash).

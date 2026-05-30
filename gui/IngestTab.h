@@ -36,6 +36,7 @@ public:
 
 signals:
     void progress(float fraction, const QString& stage);
+    void fileError(const QString& path, const QString& msg);
     void finished(pb::IngestReport report);
 
 protected:
@@ -70,6 +71,7 @@ protected:
 private slots:
     void onAddFolder();
     void onProgress(float fraction, const QString& stage);
+    void onFileError(const QString& path, const QString& msg);
     void onFinished(pb::IngestReport report);
 
 private:

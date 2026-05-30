@@ -102,7 +102,8 @@ IngestReport IngestService::ingest(const std::string& path,
                                    TrackRepository&   repo,
                                    MetadataProvider&  metaProvider,
                                    mt::ProgressCallback progress,
-                                   std::atomic<bool>* cancel) const {
+                                   std::atomic<bool>* cancel,
+                                   ErrorCallback      onError) const {
     IngestReport report;
     const auto files = collectAudioFiles(path);
     if (files.empty()) {
@@ -134,7 +135,9 @@ IngestReport IngestService::ingest(const std::string& path,
         std::string hash;
         try { hash = sha256File(filePath); }
         catch (...) {
-            { std::lock_guard lk(mutex); ++report.failed; report.errors.emplace_back(filePath, "Failed to hash file"); }
+            const std::string msg = "Failed to hash file";
+            { std::lock_guard lk(mutex); ++report.failed; report.errors.emplace_back(filePath, msg); }
+            if (onError) onError(filePath, msg);
             reportProgress("Failed: " + filename);
             return;
         }
@@ -148,7 +151,9 @@ IngestReport IngestService::ingest(const std::string& path,
         std::string err;
         const auto audio = mt::readAudioFile(filePath, &err);
         if (!audio) {
-            { std::lock_guard lk(mutex); ++report.failed; report.errors.emplace_back(filePath, "Read failed: " + err); }
+            const std::string msg = "Read failed: " + err;
+            { std::lock_guard lk(mutex); ++report.failed; report.errors.emplace_back(filePath, msg); }
+            if (onError) onError(filePath, msg);
             reportProgress("Failed: " + filename);
             return;
         }
