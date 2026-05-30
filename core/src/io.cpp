@@ -46,6 +46,14 @@ std::optional<AudioFile> readAudioFile(const std::string& path, std::string* err
             out.samples[static_cast<size_t>(c)][static_cast<size_t>(f)] =
                 interleaved[static_cast<size_t>(f * out.numChannels + c)];
 
+    const int major = info.format & SF_FORMAT_TYPEMASK;
+    if      (major == SF_FORMAT_WAV   || major == SF_FORMAT_WAVEX) out.sourceFormat = SourceFormat::wav;
+    else if (major == SF_FORMAT_AIFF)  out.sourceFormat = SourceFormat::aiff;
+    else if (major == SF_FORMAT_FLAC)  out.sourceFormat = SourceFormat::flac;
+    else if (major == SF_FORMAT_OGG)   out.sourceFormat = SourceFormat::ogg;
+    else if (major == SF_FORMAT_MPEG)  out.sourceFormat = SourceFormat::mp3;
+    else                               out.sourceFormat = SourceFormat::unknown;
+
     return out;
 }
 

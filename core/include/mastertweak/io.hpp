@@ -1,20 +1,23 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
-#include <optional>
 
 namespace mt {
 
+enum class SourceFormat { wav, flac, aiff, ogg, mp3, unknown };
+
 struct AudioFile {
     std::vector<std::vector<float>> samples;  // samples[channel][frame]
-    int numChannels = 0;
-    int numFrames   = 0;
-    int sampleRate  = 0;
-    int bitDepth    = 0;  // bits per sample in the source file
+    int          numChannels  = 0;
+    int          numFrames    = 0;
+    int          sampleRate   = 0;
+    int          bitDepth     = 0;
+    SourceFormat sourceFormat = SourceFormat::unknown;
 };
 
-// Read WAV / FLAC / AIFF (anything libsndfile supports).
+// Read WAV / FLAC / AIFF / OGG / MP3 (anything libsndfile supports).
 // Returns nullopt on failure; fills errOut if provided.
 std::optional<AudioFile> readAudioFile(const std::string& path,
                                         std::string* errOut = nullptr);
