@@ -40,6 +40,7 @@ target_link_libraries(MasterTweak
         Qt6::Widgets
         Qt6::Network
         miniaudio
+        rtmidi
 )
 
 set_target_properties(MasterTweak PROPERTIES
