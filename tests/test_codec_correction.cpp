@@ -84,6 +84,17 @@ TEST_CASE("computeCodecCorrection: file shorter than FFT size → all-zero corre
         CHECK(c == 0.f);
 }
 
+TEST_CASE("computeCodecCorrection: low sample-rate file → all-zero corrections") {
+    // At sr=22050, nyquist=11025 Hz — Air band (>16 kHz) has no representable bins.
+    // Must return zeros rather than spurious max correction.
+    auto af = makeMono(22050, 2.f);
+    for (float f : {1000.f, 4000.f, 8000.f, 10000.f})
+        addSine(af, f, 0.1f);
+    const auto corr = mt::computeCodecCorrection(af);
+    for (float c : corr)
+        CHECK(c == 0.f);
+}
+
 TEST_CASE("computeCodecCorrection: bass-only signal → all-zero corrections") {
     // 440 Hz sine has no HF energy; baseline (8-12 kHz) will be < -50 dBFS
     auto af = makeMono(44100, 2.f);

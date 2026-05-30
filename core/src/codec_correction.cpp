@@ -83,7 +83,7 @@ std::array<float, 7> computeCodecCorrection(const AudioFile& audio) {
 
     const float sr      = static_cast<float>(audio.sampleRate);
     const float nyquist = sr / 2.f;
-    if (nyquist < 8000.f) return corr;  // sample rate too low to analyse HF region
+    if (nyquist < 16000.f) return corr;  // insufficient HF range for correction
 
     const int    nch  = audio.numChannels;
     const size_t hop  = kFftN / 2;  // 50 % overlap
