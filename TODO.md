@@ -14,5 +14,6 @@
 - Copy MixAdvice preset editor feature into MasterTweak. (The scanner itself should be distributed standalone). This would allow the user to create a specific tuned profile for the track he is mastering.
   - ~~Sub-project A: `preset_builder_core` static lib (domain model, StatsService, ExportService, IngestService, SQLite adapters)~~ **DONE**
   - ~~Sub-project B: Qt6 Preset Builder dialog (Ingest / Browse+Tag / Create Preset screens)~~ **DONE**
+  - ~~Sub-project C: MP3 / OGG ingest with FFT-based spectral rolloff correction~~ **DONE** — `computeCodecCorrection()` in `mastertweak_core`; Air (±6 dB), Highs (±1.5 dB), HiMids (±0.5 dB); baked into `bandRmsDb` before DB write.
 
 - I would love to control my knobs, faders, transport and switches from my MIDI control surface (korg nanokontrol 2 ; behringer X-Touch Mini (in GM Mode)). Viewing the knobs values directly on the control surface would also be great
