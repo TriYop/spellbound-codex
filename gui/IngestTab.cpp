@@ -140,6 +140,12 @@ void IngestTab::startIngest(const std::string& path) {
 void IngestTab::onProgress(float fraction, const QString& stage) {
     progressBar_->setValue(static_cast<int>(fraction * 100.f));
     stageLabel_->setText(stage);
+    if (stage.startsWith("Ingested:"))
+        addedLbl_->setText(QString("Added: %1").arg(++liveAdded_));
+    else if (stage.startsWith("Skipped:"))
+        skippedLbl_->setText(QString("Skipped: %1").arg(++liveSkipped_));
+    else if (stage.startsWith("Failed:"))
+        failedLbl_->setText(QString("Failed: %1").arg(++liveFailed_));
 }
 
 void IngestTab::onFileError(const QString& path, const QString& msg) {
@@ -169,7 +175,13 @@ void IngestTab::setRunning(bool running) {
     stopBtn_->setEnabled(running);
     progressBar_->setVisible(running);
     stageLabel_->setVisible(running);
-    if (running) progressBar_->setValue(0);
+    if (running) {
+        progressBar_->setValue(0);
+        liveAdded_ = liveSkipped_ = liveFailed_ = 0;
+        addedLbl_->setText(  QString::fromUtf8("Added: 0"));
+        skippedLbl_->setText(QString::fromUtf8("Skipped: 0"));
+        failedLbl_->setText( QString::fromUtf8("Failed: 0"));
+    }
 }
 
 bool IngestTab::isWorkerRunning() const { return worker_->isRunning(); }

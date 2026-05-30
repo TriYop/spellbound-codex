@@ -81,6 +81,10 @@ private:
     PresetBuilderCtx& ctx_;
     IngestWorker*     worker_    = nullptr;
 
+    int liveAdded_   = 0;
+    int liveSkipped_ = 0;
+    int liveFailed_  = 0;
+
     QPushButton*  addBtn_        = nullptr;
     QPushButton*  stopBtn_       = nullptr;
     QLabel*       dropLabel_     = nullptr;
