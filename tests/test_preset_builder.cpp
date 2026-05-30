@@ -351,6 +351,28 @@ TEST_CASE("IngestService::ingest: metadata fallback on provider failure") {
     fs_ingest::remove(wavPath);
 }
 
+TEST_CASE("IngestService::ingest: parallel batch — all files ingested correctly") {
+    const auto dir = fs_ingest::temp_directory_path() / "pb_ingest_parallel";
+    fs_ingest::create_directories(dir);
+    constexpr int N = 8;
+    for (int k = 0; k < N; ++k)
+        writeSineWav((dir / ("track_" + std::to_string(k) + ".wav")).string(),
+                     200.f + static_cast<float>(k) * 100.f);
+
+    StubTrackRepo repo;
+    AlwaysSucceedMetadataProvider meta;
+    pb::IngestService svc;
+
+    auto report = svc.ingest(dir.string(), repo, meta);
+
+    CHECK(report.added   == N);
+    CHECK(report.skipped == 0);
+    CHECK(report.failed  == 0);
+    CHECK(static_cast<int>(repo.store.size()) == N);
+
+    fs_ingest::remove_all(dir);
+}
+
 TEST_CASE("IngestService::ingest directory: scans recursively") {
     const auto dir = fs_ingest::temp_directory_path() / "pb_ingest_dir";
     fs_ingest::create_directories(dir / "sub");

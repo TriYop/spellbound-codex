@@ -6,11 +6,14 @@
 
 #include "picosha2.h"
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <mutex>
 #include <sstream>
+#include <thread>
 
 namespace fs = std::filesystem;
 
@@ -101,43 +104,55 @@ IngestReport IngestService::ingest(const std::string& path,
                                    mt::ProgressCallback progress) const {
     IngestReport report;
     const auto files = collectAudioFiles(path);
-    const auto total = static_cast<float>(files.size());
+    if (files.empty()) {
+        if (progress) progress(1.f, "Done");
+        return report;
+    }
+    const float total = static_cast<float>(files.size());
 
-    for (size_t i = 0; i < files.size(); ++i) {
+    const unsigned      nThreads = std::max(1u, std::thread::hardware_concurrency());
+    std::atomic<size_t> nextIndex{0};
+    std::atomic<size_t> doneCount{0};
+    std::mutex          mutex;
+
+    // Increment done counter and fire progress outside any lock.
+    auto reportProgress = [&](const std::string& msg) {
+        const size_t n = doneCount.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (progress) progress(static_cast<float>(n) / total, msg);
+    };
+
+    // Per-file pipeline — uses return for early exits so the worker loop stays clean.
+    // Heavy CPU work (hash / decode / analyse) runs lock-free.
+    // DB and MetadataProvider calls are serialised behind mutex (single SQLite connection;
+    // MetadataProvider may use Qt network internals that are not thread-safe).
+    auto processFile = [&](size_t i) {
         const std::string filePath = files[i].string();
+        const std::string filename = files[i].filename().string();
 
-        if (progress)
-            progress(static_cast<float>(i) / total,
-                     "Ingesting: " + files[i].filename().string());
-
-        // 1. Hash
+        // 1. Hash — pure I/O, no shared state
         std::string hash;
-        try {
-            hash = sha256File(filePath);
-        } catch (...) {
-            ++report.failed;
-            report.errors.emplace_back(filePath, "Failed to hash file");
-            continue;
+        try { hash = sha256File(filePath); }
+        catch (...) {
+            { std::lock_guard lk(mutex); ++report.failed; report.errors.emplace_back(filePath, "Failed to hash file"); }
+            reportProgress("Failed: " + filename);
+            return;
         }
 
-        // 2. Skip if already in DB
-        if (repo.find(TrackId{hash})) {
-            ++report.skipped;
-            continue;
-        }
+        // 2. DB skip-check — serialised
+        bool inDb = false;
+        { std::lock_guard lk(mutex); inDb = static_cast<bool>(repo.find(TrackId{hash})); if (inDb) ++report.skipped; }
+        if (inDb) { reportProgress("Skipped: " + filename); return; }
 
-        // 3. Analyse
+        // 3. Decode + analyse — lock-free, per-file AudioFile owns its data
         std::string err;
         const auto audio = mt::readAudioFile(filePath, &err);
         if (!audio) {
-            ++report.failed;
-            report.errors.emplace_back(filePath, "Read failed: " + err);
-            continue;
+            { std::lock_guard lk(mutex); ++report.failed; report.errors.emplace_back(filePath, "Read failed: " + err); }
+            reportProgress("Failed: " + filename);
+            return;
         }
         const auto snap = mt::analyseFile(*audio);
         auto analysis   = toTrackAnalysis(snap);
-
-        // Boost per-band RMS to compensate for lossy codec rolloff
         if (audio->sourceFormat == mt::SourceFormat::mp3 ||
             audio->sourceFormat == mt::SourceFormat::ogg) {
             const auto corr = mt::computeCodecCorrection(*audio);
@@ -145,21 +160,47 @@ IngestReport IngestService::ingest(const std::string& path,
                 analysis.bandRmsDb[j] += corr[j];
         }
 
-        // 4. Metadata (provider → filename fallback)
-        auto meta = metaProvider.lookup(filePath);
+        // 4. Metadata — serialised
+        std::optional<TrackMetadata> meta;
+        { std::lock_guard lk(mutex); meta = metaProvider.lookup(filePath); }
         if (!meta) meta = parseFilenameMetadata(filePath);
 
-        // 5. Persist
+        // 5. Persist — serialised
         Track track;
         track.id       = TrackId{hash};
         track.path     = filePath;
         track.metadata = *meta;
         track.analysis = analysis;
         track.addedAt  = utcNow();
-        repo.save(track);
+        { std::lock_guard lk(mutex); repo.save(track); ++report.added; }
+        reportProgress("Ingested: " + filename);
+    };
 
-        ++report.added;
-    }
+    // Worker: pull file indices atomically, wrap processFile for exception safety
+    // (unexpected throws from repo/provider must not escape std::thread).
+    auto workerFn = [&]() noexcept {
+        while (true) {
+            const size_t i = nextIndex.fetch_add(1, std::memory_order_relaxed);
+            if (i >= files.size()) break;
+            try {
+                processFile(i);
+            } catch (const std::exception& ex) {
+                std::lock_guard lk(mutex);
+                ++report.failed;
+                report.errors.emplace_back(files[i].string(), ex.what());
+            } catch (...) {
+                std::lock_guard lk(mutex);
+                ++report.failed;
+                report.errors.emplace_back(files[i].string(), "unknown error");
+            }
+        }
+    };
+
+    std::vector<std::thread> threads;
+    threads.reserve(nThreads);
+    for (unsigned t = 0; t < nThreads; ++t)
+        threads.emplace_back(workerFn);
+    for (auto& t : threads) t.join();
 
     if (progress) progress(1.f, "Done");
     return report;
