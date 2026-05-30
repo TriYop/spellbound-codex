@@ -4,6 +4,7 @@
 #include "mastertweak/analysis.hpp"
 #include "mastertweak/pipeline.hpp"
 #include "mastertweak/preset.hpp"
+#include "MidiMapping.h"
 #include "TargetLevelCombo.h"
 
 #include <QMainWindow>
@@ -12,6 +13,7 @@
 #include <string>
 
 QT_BEGIN_NAMESPACE
+class QAction;
 class QCheckBox;
 class QComboBox;
 class QLabel;
@@ -20,7 +22,9 @@ class QPushButton;
 QT_END_NAMESPACE
 
 namespace gui {
+class AudioControl;
 class ChainPanel;
+class MidiController;
 class PresetBuilderDialog;
 class PresetSelector;
 class TransportWidget;
@@ -88,6 +92,8 @@ private slots:
     void onRenderProgress(float fraction, const QString& stage);
     void onRenderFinished(bool ok, const QString& errorMsg, mt::MasterResult result);
     void onManagePresets();
+    void onMidiCC(int channel, int cc, int value);
+    void onMidiNoteOn(int channel, int note, int velocity);
 
 private:
     void buildUi();
@@ -119,6 +125,13 @@ private:
     int              analysisSeq_    = 0;
     RenderWorker*    renderWorker_   = nullptr;
     QProgressDialog* progressDialog_ = nullptr;
+
+    // ── MIDI ──────────────────────────────────────────────────────────────────
+    MidiController* midi_              = nullptr;
+    MidiMap         midiMap_           = MidiMap::defaultMap();
+    QAction*        midiSettingsAction_ = nullptr;
+
+    AudioControl* controlForParam(MidiParam p) const;
 };
 
 } // namespace gui

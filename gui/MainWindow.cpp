@@ -1,9 +1,13 @@
 #include "MainWindow.h"
+#include "AudioControl.h"
 #include "ChainPanel.h"
+#include "MidiController.h"
 #include "PresetBuilderDialog.h"
 #include "PresetSelector.h"
+#include "RotaryKnob.h"
 #include "TargetLevelCombo.h"
 #include "TransportWidget.h"
+#include "VerticalFader.h"
 #include "utils.h"
 
 #include <QApplication>
@@ -13,10 +17,12 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenuBar>
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSettings>
 #include <QVBoxLayout>
 
 #include <cctype>
@@ -194,6 +200,50 @@ void MainWindow::buildUi() {
     renderWorker_ = new RenderWorker(this);
     connect(renderWorker_, &RenderWorker::progress, this, &MainWindow::onRenderProgress);
     connect(renderWorker_, &RenderWorker::finished, this, &MainWindow::onRenderFinished);
+
+    // ── MIDI controller ───────────────────────────────────────────────────────
+    midi_ = new MidiController(this);
+    connect(midi_, &MidiController::ccReceived,
+            this,  &MainWindow::onMidiCC);
+    connect(midi_, &MidiController::noteOnReceived,
+            this,  &MainWindow::onMidiNoteOn);
+
+    // GUI → MIDI feedback: valueChanged fires only on user interaction (not setValue),
+    // so connecting here creates no feedback loop.
+    auto connectFeedback = [this](AudioControl* ctrl, MidiParam p) {
+        connect(ctrl, &AudioControl::valueChanged, this,
+                [this, ctrl, p](double v) {
+                    const auto& b = midiMap_.ccFor(p);
+                    if (b.cc >= 0)
+                        midi_->sendCC(0, b.cc,
+                                      valueToCC(v, ctrl->minimum(), ctrl->maximum()));
+                });
+    };
+    for (int i = 0; i < 7; ++i)
+        connectFeedback(chainPanel_->eqGainFader(i),
+                        static_cast<MidiParam>(static_cast<int>(MidiParam::EqBand0) + i));
+    connectFeedback(chainPanel_->satDriveKnob(),     MidiParam::SatDrive);
+    connectFeedback(chainPanel_->mixbusThreshKnob(), MidiParam::MixbusThresh);
+    connectFeedback(chainPanel_->mixbusMakeupKnob(), MidiParam::MixbusMakeup);
+    connectFeedback(chainPanel_->limCeilingFader(),  MidiParam::LimCeiling);
+
+    // Re-open MIDI ports saved from last session.
+    {
+        QSettings s("MasterTweak", "MasterTweak");
+        const QString savedIn  = s.value("midi/inputPort").toString();
+        const QString savedOut = s.value("midi/outputPort").toString();
+        const auto inPorts  = midi_->inputPortNames();
+        const auto outPorts = midi_->outputPortNames();
+        for (unsigned i = 0; i < inPorts.size(); ++i)
+            if (inPorts[i] == savedIn)  { midi_->openInput(i);  break; }
+        for (unsigned i = 0; i < outPorts.size(); ++i)
+            if (outPorts[i] == savedOut) { midi_->openOutput(i); break; }
+    }
+
+    // ── MIDI menu ─────────────────────────────────────────────────────────────
+    auto* midiMenu = menuBar()->addMenu("MIDI");
+    midiSettingsAction_ = midiMenu->addAction(QString::fromUtf8("MIDI Settings\xe2\x80\xa6"));
+    midiSettingsAction_->setEnabled(false);  // enabled in Task 7 when dialog is wired
 }
 
 void MainWindow::onOpenFile() {
@@ -351,6 +401,50 @@ void MainWindow::onManagePresets() {
     presetBuilderDialog_->show();
     presetBuilderDialog_->raise();
     presetBuilderDialog_->activateWindow();
+}
+
+AudioControl* MainWindow::controlForParam(MidiParam p) const {
+    switch (p) {
+        case MidiParam::EqBand0: return chainPanel_->eqGainFader(0);
+        case MidiParam::EqBand1: return chainPanel_->eqGainFader(1);
+        case MidiParam::EqBand2: return chainPanel_->eqGainFader(2);
+        case MidiParam::EqBand3: return chainPanel_->eqGainFader(3);
+        case MidiParam::EqBand4: return chainPanel_->eqGainFader(4);
+        case MidiParam::EqBand5: return chainPanel_->eqGainFader(5);
+        case MidiParam::EqBand6: return chainPanel_->eqGainFader(6);
+        case MidiParam::SatDrive:     return chainPanel_->satDriveKnob();
+        case MidiParam::MixbusThresh: return chainPanel_->mixbusThreshKnob();
+        case MidiParam::MixbusMakeup: return chainPanel_->mixbusMakeupKnob();
+        case MidiParam::LimCeiling:   return chainPanel_->limCeilingFader();
+        default: return nullptr;
+    }
+}
+
+void MainWindow::onMidiCC(int channel, int cc, int value) {
+    // Check CC-controlled params
+    for (std::size_t i = 0; i < static_cast<std::size_t>(kMidiParamCcCount); ++i) {
+        const auto& b = midiMap_.ccBindings[i];
+        if (b.cc == cc && (b.channel < 0 || b.channel == channel)) {
+            if (auto* ctrl = controlForParam(static_cast<MidiParam>(static_cast<int>(i))))
+                ctrl->setValue(ccToValue(value, ctrl->minimum(), ctrl->maximum()));
+            return;
+        }
+    }
+    // Check transport triggers — nanoKONTROL2 sends CC (not Note) for transport.
+    // We store the CC# in noteBindings[].note and check here on value > 63 (button press).
+    if (value > 63) {
+        if (midiMap_.noteBindings[0].note == cc) transport_->play();
+        if (midiMap_.noteBindings[1].note == cc) transport_->stop();
+    }
+}
+
+void MainWindow::onMidiNoteOn(int channel, int note, int /*velocity*/) {
+    const auto& nb0 = midiMap_.noteBindings[0];
+    const auto& nb1 = midiMap_.noteBindings[1];
+    if (nb0.note == note && (nb0.channel < 0 || nb0.channel == channel))
+        transport_->play();
+    if (nb1.note == note && (nb1.channel < 0 || nb1.channel == channel))
+        transport_->stop();
 }
 
 } // namespace gui
