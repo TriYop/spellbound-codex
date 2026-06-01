@@ -86,19 +86,23 @@ TEST_CASE("SimilarityService::discover: two similar tracks cluster below thresho
 }
 
 TEST_CASE("SimilarityService::discover: outlier excluded from group") {
-    Track t0 = makeTrack(0.f);
-    Track t1 = makeTrack(0.f);
-    Track t2 = makeTrack(30.f);  // outlier
+    Track trackA = makeTrack(0.f);
+    Track trackB = makeTrack(0.f);
+    Track trackC = makeTrack(30.f);  // outlier
+    // Give trackC a unique hash so we can identify it in the output.
+    trackC.id.hash = "outlier-hash";
 
     SimilarityService svc;
-    auto groups = svc.discover({t0, t1, t2}, 1.0f);
+    auto groups = svc.discover({trackA, trackB, trackC}, 1.0f);
 
-    // Outlier should not appear in any group (or groups should have no size-1 group).
-    for (const auto& g : groups) {
-        for (const auto& t : g.tracks) {
-            CHECK(t.analysis.overallRmsDb != doctest::Approx(-18.f + 30.f));
-        }
-    }
+    REQUIRE(groups.size() == 1);
+    const auto& g = groups[0];
+    CHECK(g.tracks.size() == 2);
+    // Verify the outlier (trackC) is not in the group.
+    bool outlierInGroup = false;
+    for (const auto& t : g.tracks)
+        if (t.id.hash == trackC.id.hash) outlierInGroup = true;
+    CHECK_FALSE(outlierInGroup);
 }
 
 TEST_CASE("SimilarityService::discover: threshold 0 returns empty") {

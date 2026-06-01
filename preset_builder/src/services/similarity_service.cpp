@@ -82,7 +82,7 @@ std::vector<SimilarityGroup> SimilarityService::discover(
                     for (size_t b : clusters[cj])
                         sum += static_cast<double>(dist[a][b]);
                 float avg = static_cast<float>(
-                    sum / static_cast<double>(clusters[ci].size() * clusters[cj].size()));
+                    sum / (static_cast<double>(clusters[ci].size()) * static_cast<double>(clusters[cj].size())));
 
                 if (avg < best_d) {
                     best_d = avg;
@@ -103,7 +103,6 @@ std::vector<SimilarityGroup> SimilarityService::discover(
 
     // Build result: only clusters with >= 2 tracks.
     std::vector<SimilarityGroup> result;
-    int groupIndex = 0;
     for (const auto& cl : clusters) {
         if (cl.size() < 2) continue;
 
@@ -112,9 +111,7 @@ std::vector<SimilarityGroup> SimilarityService::discover(
         for (size_t idx : cl)
             grp.tracks.push_back(tracks[idx]);
 
-        grp.suggestedName = suggestName(grp.tracks, groupIndex + 1);
         result.push_back(std::move(grp));
-        ++groupIndex;
     }
 
     // Sort largest-first.
@@ -122,6 +119,11 @@ std::vector<SimilarityGroup> SimilarityService::discover(
               [](const SimilarityGroup& a, const SimilarityGroup& b) {
                   return a.tracks.size() > b.tracks.size();
               });
+
+    // Assign suggested names after sorting so fallback "Group N" numbers match order.
+    for (size_t k = 0; k < result.size(); ++k) {
+        result[k].suggestedName = suggestName(result[k].tracks, static_cast<int>(k + 1));
+    }
 
     return result;
 }
@@ -131,12 +133,10 @@ std::vector<SimilarityGroup> SimilarityService::discover(
 // ---------------------------------------------------------------------------
 
 static std::string mostFrequentIfDominant(const std::vector<std::string>& items,
-                                           size_t total_with_metadata,
                                            bool checkDistinct = false,
                                            size_t distinctThreshold = 5)
 {
     if (items.empty()) return {};
-    if (total_with_metadata == 0) return {};
 
     // Count frequencies.
     std::map<std::string, size_t> freq;
@@ -153,7 +153,7 @@ static std::string mostFrequentIfDominant(const std::vector<std::string>& items,
                                });
 
     // Must appear in > 50% of tracks that have metadata.
-    if (it->second * 2 > total_with_metadata)
+    if (it->second * 2 > items.size())
         return it->first;
 
     return {};
@@ -174,11 +174,11 @@ std::string SimilarityService::suggestName(const std::vector<Track>& tracks, int
     }
 
     // Dominant genre: > 50% of tracks that have genre metadata.
-    std::string dominant_genre = mostFrequentIfDominant(genres, genres.size());
+    std::string dominant_genre = mostFrequentIfDominant(genres);
 
     // Dominant artist: > 50% of tracks with artist metadata AND < 5 distinct artists.
     std::string dominant_artist = mostFrequentIfDominant(
-        artists, artists.size(), /*checkDistinct=*/true, /*distinctThreshold=*/5);
+        artists, /*checkDistinct=*/true, /*distinctThreshold=*/5);
 
     // Decade: only if year range <= 15.
     std::string decade;
