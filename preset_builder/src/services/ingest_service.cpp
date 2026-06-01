@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iomanip>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <thread>
 
@@ -105,7 +106,26 @@ IngestReport IngestService::ingest(const std::string& path,
                                    std::atomic<bool>* cancel,
                                    ErrorCallback      onError) const {
     IngestReport report;
-    const auto files = collectAudioFiles(path);
+    auto files = collectAudioFiles(path);
+
+    // Dismiss files whose basename + byte size matches an earlier entry in
+    // the scan. Catches copies of the same audio file spread across
+    // subdirectories without touching the hash.
+    {
+        std::set<std::pair<std::string, std::uintmax_t>> seen;
+        std::vector<fs::path> unique;
+        unique.reserve(files.size());
+        for (const auto& p : files) {
+            std::error_code ec;
+            const auto sz = fs::file_size(p, ec);
+            if (!ec && !seen.emplace(p.filename().string(), sz).second)
+                ++report.skipped;
+            else
+                unique.push_back(p);
+        }
+        files = std::move(unique);
+    }
+
     if (files.empty()) {
         if (progress) progress(1.f, "Done");
         return report;
@@ -131,7 +151,18 @@ IngestReport IngestService::ingest(const std::string& path,
         const std::string filePath = files[i].string();
         const std::string filename = files[i].filename().string();
 
-        // 1. Hash — pure I/O, no shared state
+        // 1. Stat the file — single syscall, no file reading
+        std::error_code szEc;
+        const int64_t fileSize = static_cast<int64_t>(fs::file_size(filePath, szEc));
+
+        // 2. Pre-hash DB check by (basename, size) — avoids hashing large audio files
+        if (!szEc) {
+            bool inDb = false;
+            { std::lock_guard lk(mutex); inDb = repo.existsByBasenameAndSize(filename, fileSize); if (inDb) ++report.skipped; }
+            if (inDb) { reportProgress("Skipped: " + filename); return; }
+        }
+
+        // 3. Hash — pure I/O, no shared state
         std::string hash;
         try { hash = sha256File(filePath); }
         catch (...) {
@@ -142,9 +173,21 @@ IngestReport IngestService::ingest(const std::string& path,
             return;
         }
 
-        // 2. DB skip-check — serialised
+        // 4. DB skip-check by hash (catches same content under a different name)
         bool inDb = false;
-        { std::lock_guard lk(mutex); inDb = static_cast<bool>(repo.find(TrackId{hash})); if (inDb) ++report.skipped; }
+        {
+            std::lock_guard lk(mutex);
+            if (const auto existing = repo.find(TrackId{hash})) {
+                inDb = true;
+                ++report.skipped;
+                // Backfill file_size for tracks ingested before this column existed.
+                if (!szEc && existing->fileSize == 0) {
+                    Track updated = *existing;
+                    updated.fileSize = fileSize;
+                    repo.save(updated);
+                }
+            }
+        }
         if (inDb) { reportProgress("Skipped: " + filename); return; }
 
         // 3. Decode + analyse — lock-free, per-file AudioFile owns its data
@@ -175,6 +218,7 @@ IngestReport IngestService::ingest(const std::string& path,
         Track track;
         track.id       = TrackId{hash};
         track.path     = filePath;
+        track.fileSize = szEc ? 0 : fileSize;
         track.metadata = *meta;
         track.analysis = analysis;
         track.addedAt  = utcNow();

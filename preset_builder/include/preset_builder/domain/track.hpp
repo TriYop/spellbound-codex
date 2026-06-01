@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -41,6 +42,7 @@ struct TrackFilter {
 struct Track {
     TrackId       id;
     std::string   path;
+    int64_t       fileSize  = 0;  // bytes, from stat at ingest time
     TrackMetadata metadata;
     TrackAnalysis analysis;
     std::string   addedAt;  // ISO 8601 (UTC)

@@ -46,7 +46,7 @@ static MetadataSource sourceFrom(const std::string& s) {
 // ── row builder ───────────────────────────────────────────────────────────────
 
 static const char* kSelectJoin =
-    "SELECT t.id, t.path, t.added_at,"
+    "SELECT t.id, t.path, t.file_size, t.added_at,"
     "       m.title, m.artist, m.album, m.genre, m.year, m.source,"
     "       a.band_rms_db, a.band_corr, a.band_transient_db,"
     "       a.overall_rms_db, a.overall_corr"
@@ -56,9 +56,10 @@ static const char* kSelectJoin =
 
 static Track stmtToTrack(sqlite3_stmt* st) {
     Track t;
-    t.id.hash = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
-    t.path    = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
-    t.addedAt = reinterpret_cast<const char*>(sqlite3_column_text(st, 2));
+    t.id.hash  = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
+    t.path     = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+    t.fileSize = sqlite3_column_int64(st, 2);
+    t.addedAt  = reinterpret_cast<const char*>(sqlite3_column_text(st, 3));
 
     auto optCol = [&](int i) -> std::optional<std::string> {
         const unsigned char* v = sqlite3_column_text(st, i);
@@ -70,19 +71,19 @@ static Track stmtToTrack(sqlite3_stmt* st) {
         return v ? reinterpret_cast<const char*>(v) : "";
     };
 
-    t.metadata.title  = optCol(3);
-    t.metadata.artist = optCol(4);
-    t.metadata.album  = optCol(5);
-    t.metadata.genre  = optCol(6);
-    if (sqlite3_column_type(st, 7) != SQLITE_NULL)
-        t.metadata.year = sqlite3_column_int(st, 7);
-    t.metadata.source = sourceFrom(col(8));
+    t.metadata.title  = optCol(4);
+    t.metadata.artist = optCol(5);
+    t.metadata.album  = optCol(6);
+    t.metadata.genre  = optCol(7);
+    if (sqlite3_column_type(st, 8) != SQLITE_NULL)
+        t.metadata.year = sqlite3_column_int(st, 8);
+    t.metadata.source = sourceFrom(col(9));
 
-    t.analysis.bandRmsDb       = jsonToFloatArray(col(9));
-    t.analysis.bandCorr        = jsonToFloatArray(col(10));
-    t.analysis.bandTransientDb = jsonToFloatArray(col(11));
-    t.analysis.overallRmsDb    = static_cast<float>(sqlite3_column_double(st, 12));
-    t.analysis.overallCorr     = static_cast<float>(sqlite3_column_double(st, 13));
+    t.analysis.bandRmsDb       = jsonToFloatArray(col(10));
+    t.analysis.bandCorr        = jsonToFloatArray(col(11));
+    t.analysis.bandTransientDb = jsonToFloatArray(col(12));
+    t.analysis.overallRmsDb    = static_cast<float>(sqlite3_column_double(st, 13));
+    t.analysis.overallCorr     = static_cast<float>(sqlite3_column_double(st, 14));
     return t;
 }
 
@@ -95,11 +96,12 @@ void SqliteTrackRepository::save(const Track& t) {
     sqlite3_stmt* st = nullptr;
 
     sqlite3_prepare_v2(db,
-        "INSERT OR REPLACE INTO tracks(id, path, added_at) VALUES(?,?,?);",
+        "INSERT OR REPLACE INTO tracks(id, path, file_size, added_at) VALUES(?,?,?,?);",
         -1, &st, nullptr);
     sqlite3_bind_text(st, 1, t.id.hash.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, t.path.c_str(),     -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(st, 3, t.addedAt.c_str(),  -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(st, 3, t.fileSize);
+    sqlite3_bind_text(st, 4, t.addedAt.c_str(),  -1, SQLITE_TRANSIENT);
     sqlite3_step(st);
     sqlite3_finalize(st);
 
@@ -188,6 +190,24 @@ std::vector<Track> SqliteTrackRepository::search(const TrackFilter& filter) cons
     while (sqlite3_step(st) == SQLITE_ROW) results.push_back(stmtToTrack(st));
     sqlite3_finalize(st);
     return results;
+}
+
+bool SqliteTrackRepository::existsByBasenameAndSize(const std::string& basename,
+                                                      int64_t            size) const {
+    sqlite3_stmt* st = nullptr;
+    sqlite3_prepare_v2(db_.handle(),
+        "SELECT 1 FROM tracks"
+        " WHERE file_size = ? AND path LIKE '%' || ? LIMIT 1;",
+        -1, &st, nullptr);
+    sqlite3_bind_int64(st, 1, size);
+    // Match any path whose last component equals basename.
+    // We use '/' || basename as suffix; on Windows paths use '\' — acceptable
+    // since MasterTweak targets Linux.
+    const std::string suffix = "/" + basename;
+    sqlite3_bind_text(st, 2, suffix.c_str(), -1, SQLITE_TRANSIENT);
+    const bool found = (sqlite3_step(st) == SQLITE_ROW);
+    sqlite3_finalize(st);
+    return found;
 }
 
 void SqliteTrackRepository::remove(const TrackId& id) {

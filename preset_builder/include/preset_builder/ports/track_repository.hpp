@@ -2,6 +2,7 @@
 
 #include "preset_builder/domain/track.hpp"
 
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -17,6 +18,11 @@ public:
     // Returns all tracks matching the filter (AND of provided fields).
     // An empty TrackFilter returns all tracks.
     virtual std::vector<Track>   search(const TrackFilter& filter) const = 0;
+
+    // True if any stored track has the given filename (basename only, no
+    // directory) and byte size. Used as a cheap pre-hash duplicate check.
+    virtual bool existsByBasenameAndSize(const std::string& basename,
+                                         int64_t            size) const = 0;
 
     virtual void save(const Track& track) = 0;       // insert or update
     virtual void remove(const TrackId& id) = 0;

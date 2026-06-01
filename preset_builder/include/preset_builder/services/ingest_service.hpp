@@ -14,7 +14,7 @@ namespace pb {
 
 struct IngestReport {
     int  added     = 0;
-    int  skipped   = 0;    // already in DB (same SHA-256 hash)
+    int  skipped   = 0;    // already in DB (basename+size match or same SHA-256 hash)
     int  failed    = 0;
     bool cancelled = false; // set when caller signals stop via cancel token
     std::vector<std::pair<std::string, std::string>> errors;  // {path, message}
@@ -22,8 +22,8 @@ struct IngestReport {
 
 class IngestService {
 public:
-    // Ingest a single file or a directory (recursive scan for WAV/FLAC/AIFF/AIF).
-    // Skips files already in the repository (by SHA-256 hash).
+    // Ingest a single file or a directory (recursive scan for WAV/FLAC/AIFF/AIF/MP3/OGG).
+    // Skips files already in the repository (by basename+size pre-check, then SHA-256).
     // Falls back to parseFilenameMetadata() when MetadataProvider returns nullopt.
     // Pass a non-null cancel pointer to support cooperative cancellation: the
     // worker threads check it between files and stop as soon as it is true.

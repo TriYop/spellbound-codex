@@ -35,11 +35,17 @@ void Database::createSchema() {
     exec(db_, "PRAGMA foreign_keys = ON;");
     exec(db_, R"(
         CREATE TABLE IF NOT EXISTS tracks (
-            id       TEXT PRIMARY KEY,
-            path     TEXT,
-            added_at TEXT
+            id        TEXT PRIMARY KEY,
+            path      TEXT,
+            file_size INTEGER DEFAULT 0,
+            added_at  TEXT
         );
     )");
+    // Migration: add file_size to databases created before this column existed.
+    // sqlite3_exec returns SQLITE_ERROR with "duplicate column name" if it exists; ignore that.
+    sqlite3_exec(db_,
+        "ALTER TABLE tracks ADD COLUMN file_size INTEGER DEFAULT 0;",
+        nullptr, nullptr, nullptr);
     exec(db_, R"(
         CREATE TABLE IF NOT EXISTS track_metadata (
             track_id TEXT PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE,

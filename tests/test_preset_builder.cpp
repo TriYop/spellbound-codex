@@ -242,6 +242,13 @@ struct StubTrackRepo : pb::TrackRepository {
         for (const auto& [k, t] : store) v.push_back(t);
         return v;
     }
+    bool existsByBasenameAndSize(const std::string& basename, int64_t size) const override {
+        namespace fs = std::filesystem;
+        for (const auto& [k, t] : store)
+            if (fs::path(t.path).filename().string() == basename && t.fileSize == size)
+                return true;
+        return false;
+    }
     void save(const pb::Track& t) override { store[t.id.hash] = t; }
     void remove(const pb::TrackId& id) override { store.erase(id.hash); }
 };
@@ -391,6 +398,62 @@ TEST_CASE("IngestService::ingest directory: scans recursively") {
     CHECK(report.added  == 2);
     CHECK(report.failed == 0);
     CHECK(repo.store.size() == 2);
+
+    fs_ingest::remove_all(dir);
+}
+
+TEST_CASE("IngestService::ingest: basename+size already in DB → skipped without hashing") {
+    // First ingest adds the file to the repo.
+    // Second scan brings a DIFFERENT file with the same basename and byte size.
+    // The DB pre-check (basename+size) must skip it before computing the hash.
+    const auto dir1 = fs_ingest::temp_directory_path() / "pb_ingest_db_dedup1";
+    const auto dir2 = fs_ingest::temp_directory_path() / "pb_ingest_db_dedup2";
+    fs_ingest::create_directories(dir1);
+    fs_ingest::create_directories(dir2);
+
+    const std::string name = "Track.wav";
+    writeSineWav((dir1 / name).string(), 440.f);  // ingested first
+    writeSineWav((dir2 / name).string(), 880.f);  // same basename+size, different content
+
+    StubTrackRepo repo;
+    AlwaysSucceedMetadataProvider meta;
+    pb::IngestService svc;
+
+    auto r1 = svc.ingest((dir1 / name).string(), repo, meta);
+    CHECK(r1.added == 1);
+
+    // Second file has a different hash → without DB pre-check it would be added
+    auto r2 = svc.ingest((dir2 / name).string(), repo, meta);
+    CHECK(r2.added   == 0);
+    CHECK(r2.skipped == 1);
+    CHECK(repo.store.size() == 1);
+
+    fs_ingest::remove_all(dir1);
+    fs_ingest::remove_all(dir2);
+}
+
+TEST_CASE("IngestService::ingest directory: same basename+size in two subdirs → second dismissed without hashing") {
+    // Two WAV files with identical basename and byte size but different audio content
+    // (different frequency → different SHA-256). Without basename+size dedup the current
+    // hash-based check would add both. With dedup the second must be skipped.
+    const auto dir = fs_ingest::temp_directory_path() / "pb_ingest_dedup";
+    fs_ingest::create_directories(dir / "sub1");
+    fs_ingest::create_directories(dir / "sub2");
+
+    const std::string name = "My Song.wav";
+    writeSineWav((dir / "sub1" / name).string(), 440.f);   // 440 Hz sine
+    writeSineWav((dir / "sub2" / name).string(), 880.f);   // 880 Hz sine — same size, different content
+
+    StubTrackRepo repo;
+    AlwaysSucceedMetadataProvider meta;
+    pb::IngestService svc;
+
+    auto report = svc.ingest(dir.string(), repo, meta);
+
+    CHECK(report.added   == 1);
+    CHECK(report.skipped == 1);
+    CHECK(report.failed  == 0);
+    CHECK(repo.store.size() == 1);
 
     fs_ingest::remove_all(dir);
 }
