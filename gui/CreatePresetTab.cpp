@@ -1,4 +1,5 @@
 #include "CreatePresetTab.h"
+#include "AutoDiscoverDialog.h"
 #include "PresetBuilderCtx.h"
 #include "utils.h"
 
@@ -149,10 +150,13 @@ CreatePresetTab::CreatePresetTab(PresetBuilderCtx& ctx, QWidget* parent)
         exportStatusLbl_ = new QLabel(this);
         exportBtn_->setEnabled(false);
         saveAsBtn_->setEnabled(false);
-        connect(exportBtn_, &QPushButton::clicked, this, &CreatePresetTab::onExportDefault);
-        connect(saveAsBtn_, &QPushButton::clicked, this, &CreatePresetTab::onSaveAs);
+        autoDiscoverBtn_ = new QPushButton("Auto-Discover\xe2\x80\xa6", this);
+        connect(exportBtn_,       &QPushButton::clicked, this, &CreatePresetTab::onExportDefault);
+        connect(saveAsBtn_,       &QPushButton::clicked, this, &CreatePresetTab::onSaveAs);
+        connect(autoDiscoverBtn_, &QPushButton::clicked, this, &CreatePresetTab::onAutoDiscover);
         row->addWidget(exportBtn_);
         row->addWidget(saveAsBtn_);
+        row->addWidget(autoDiscoverBtn_);
         row->addWidget(exportStatusLbl_, 1);
         vbox->addLayout(row);
     }
@@ -337,6 +341,13 @@ void CreatePresetTab::onSaveAs() {
         "XML Presets (*.xml);;All Files (*)");
     if (path.isEmpty()) return;
     doExport(path.toStdString());
+}
+
+void CreatePresetTab::onAutoDiscover() {
+    AutoDiscoverDialog dlg(ctx_, this);
+    connect(&dlg, &AutoDiscoverDialog::presetSaved,
+            this, &CreatePresetTab::refreshTrackList);
+    dlg.exec();
 }
 
 } // namespace gui

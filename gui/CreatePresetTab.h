@@ -58,6 +58,7 @@ private slots:
     void onStatsReady(pb::PresetStats stats);
     void onExportDefault();
     void onSaveAs();
+    void onAutoDiscover();
 
 private:
     void populateTrackTable(const std::vector<pb::Track>& tracks);
@@ -88,6 +89,7 @@ private:
     QLabel*      exportStatusLbl_ = nullptr;
     QPushButton* exportBtn_       = nullptr;
     QPushButton* saveAsBtn_       = nullptr;
+    QPushButton* autoDiscoverBtn_ = nullptr;
 
     // State
     std::set<std::string>  selectedHashes_;   // persists across filter changes
