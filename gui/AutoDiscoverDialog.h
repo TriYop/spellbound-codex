@@ -9,6 +9,7 @@
 #include <vector>
 
 QT_BEGIN_NAMESPACE
+class QCloseEvent;
 class QDoubleSpinBox;
 class QLabel;
 class QLineEdit;
@@ -48,6 +49,9 @@ public:
 
 signals:
     void presetSaved();
+
+protected:
+    void closeEvent(QCloseEvent* event) override;
 
 private slots:
     void onDiscover();

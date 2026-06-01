@@ -5,6 +5,7 @@
 #include "preset_builder/services/export_service.hpp"
 #include "preset_builder/services/stats_service.hpp"
 
+#include <QCloseEvent>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QDoubleSpinBox>
@@ -360,6 +361,15 @@ std::string AutoDiscoverDialog::buildOutputPath(const std::string& name) const {
     return (QDir::homePath() + "/.config/MixAdvice/Presets/"
             + QString::fromStdString(gui::sanitizePresetName(name))
             + ".xml").toStdString();
+}
+
+void AutoDiscoverDialog::closeEvent(QCloseEvent* event) {
+    // Wait for any running discovery to complete before closing,
+    // to avoid destroying the worker while the thread is still running.
+    if (worker_ && worker_->isRunning()) {
+        worker_->wait();
+    }
+    QDialog::closeEvent(event);
 }
 
 } // namespace gui
