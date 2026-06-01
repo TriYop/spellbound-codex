@@ -30,6 +30,8 @@ qt_add_executable(MasterTweak
     BrowseTab.cpp
     CreatePresetTab.h
     CreatePresetTab.cpp
+    ManagePresetsTab.h
+    ManagePresetsTab.cpp
     AutoDiscoverDialog.h
     AutoDiscoverDialog.cpp
     MidiController.h

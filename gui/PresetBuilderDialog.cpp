@@ -2,6 +2,7 @@
 #include "BrowseTab.h"
 #include "CreatePresetTab.h"
 #include "IngestTab.h"
+#include "ManagePresetsTab.h"
 #include "PresetBuilderCtx.h"
 
 #include <QCloseEvent>
@@ -40,10 +41,12 @@ void PresetBuilderDialog::buildUi() {
     ingestTab_  = new IngestTab(*ctx_, this);
     browseTab_  = new BrowseTab(*ctx_, this);
     createTab_  = new CreatePresetTab(*ctx_, this);
+    manageTab_ = new ManagePresetsTab(*ctx_, this);
 
     tabs_->addTab(ingestTab_,  "Ingest");
     tabs_->addTab(browseTab_,  "Browse / Tag");
     tabs_->addTab(createTab_,  "Create Preset");
+    tabs_->addTab(manageTab_, "Manage Presets");
 
     vbox->addWidget(tabs_);
 
@@ -56,6 +59,8 @@ void PresetBuilderDialog::buildUi() {
             createTab_,  &CreatePresetTab::refreshTrackList);
     connect(createTab_,  &CreatePresetTab::presetExported,
             this,        &PresetBuilderDialog::onPresetExported);
+    connect(createTab_,  &CreatePresetTab::presetExported,
+            manageTab_,  &ManagePresetsTab::refresh);
     connect(ingestTab_,  &IngestTab::ingesting,
             this,        &PresetBuilderDialog::onIngesting);
 
@@ -71,6 +76,7 @@ void PresetBuilderDialog::onPresetExported() {
 void PresetBuilderDialog::onIngesting(bool active) {
     tabs_->setTabEnabled(1, !active);  // Browse / Tag
     tabs_->setTabEnabled(2, !active);  // Create Preset
+    tabs_->setTabEnabled(3, !active);  // Manage Presets
 }
 
 void PresetBuilderDialog::closeEvent(QCloseEvent* e) {

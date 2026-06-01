@@ -14,6 +14,7 @@ class PresetBuilderCtx;
 class IngestTab;
 class BrowseTab;
 class CreatePresetTab;
+class ManagePresetsTab;
 
 class PresetBuilderDialog : public QDialog {
     Q_OBJECT
@@ -44,6 +45,7 @@ private:
     IngestTab*       ingestTab_  = nullptr;
     BrowseTab*       browseTab_  = nullptr;
     CreatePresetTab* createTab_  = nullptr;
+    ManagePresetsTab* manageTab_  = nullptr;
 };
 
 } // namespace gui
