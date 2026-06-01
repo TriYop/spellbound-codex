@@ -4,7 +4,6 @@
 #include <atomic>
 #include <cassert>
 #include <cmath>
-#include <limits>
 #include <map>
 #include <numeric>
 #include <string>
@@ -47,7 +46,12 @@ float SimilarityService::distance(const TrackAnalysis& a, const TrackAnalysis& b
 }
 
 // ---------------------------------------------------------------------------
-// discover()  — average-linkage agglomerative clustering
+// discover()  — threshold-based connected-component clustering
+//
+// For each pair (i,j) whose distance < threshold, add an edge. Union-find
+// extracts connected components in O(N² / nThreads + K·α(N)) where K is the
+// number of edges. Scales to tens of thousands of tracks; avoids the O(N³)
+// agglomerative merge loop entirely.
 // ---------------------------------------------------------------------------
 
 std::vector<SimilarityGroup> SimilarityService::discover(
@@ -58,86 +62,60 @@ std::vector<SimilarityGroup> SimilarityService::discover(
     const size_t N = tracks.size();
     if (N <= 1) return {};
 
-    // Build full N×N distance matrix (0–70 % of progress).
-    // Rows are striped round-robin across hardware threads; each thread owns
-    // distinct rows, so no cell is written by more than one thread.
-    std::vector<std::vector<float>> dist(N, std::vector<float>(N, 0.f));
+    // Phase 1 (0–90 %): parallel edge collection.
+    // Each thread owns a private edge list → no shared writes, no locks.
+    const size_t nThreads = std::max(size_t(1),
+        size_t(std::thread::hardware_concurrency()));
+    std::vector<std::vector<std::pair<size_t,size_t>>> threadEdges(nThreads);
+    std::atomic<size_t> rowsDone{0};
     {
-        const size_t nThreads = std::max(size_t(1),
-            size_t(std::thread::hardware_concurrency()));
-        std::atomic<size_t> rowsDone{0};
         std::vector<std::thread> threads(nThreads);
-
         for (size_t t = 0; t < nThreads; ++t) {
             threads[t] = std::thread([&, t]() {
+                auto& edges = threadEdges[t];
                 for (size_t i = t; i < N; i += nThreads) {
                     for (size_t j = i + 1; j < N; ++j) {
-                        float d = distance(tracks[i].analysis, tracks[j].analysis);
-                        dist[i][j] = d;
-                        dist[j][i] = d;
+                        if (distance(tracks[i].analysis, tracks[j].analysis) < threshold)
+                            edges.emplace_back(i, j);
                     }
                     const size_t done = ++rowsDone;
-                    if (progress) progress(static_cast<int>(done * 70 / N));
+                    if (progress) progress(static_cast<int>(done * 90 / N));
                 }
             });
         }
         for (auto& th : threads) th.join();
     }
 
-    // Each cluster is a vector of original track indices.
-    std::vector<std::vector<size_t>> clusters(N);
-    for (size_t i = 0; i < N; ++i)
-        clusters[i] = {i};
+    // Phase 2 (90–100 %): union-find on collected edges.
+    std::vector<size_t> parent(N);
+    std::iota(parent.begin(), parent.end(), 0);
 
-    // Average-linkage: iteratively merge the two closest clusters (70–100 %).
-    const int maxMerges = static_cast<int>(N) - 1;
-    int mergesDone = 0;
-    while (clusters.size() >= 2) {
-        size_t best_i = 0, best_j = 1;
-        float  best_d = std::numeric_limits<float>::max();
+    // Path-halving find.
+    auto find = [&](size_t x) {
+        while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+        return x;
+    };
 
-        for (size_t ci = 0; ci < clusters.size(); ++ci) {
-            for (size_t cj = ci + 1; cj < clusters.size(); ++cj) {
-                // Compute average-linkage distance between cluster ci and cj.
-                double sum = 0.0;
-                for (size_t a : clusters[ci])
-                    for (size_t b : clusters[cj])
-                        sum += static_cast<double>(dist[a][b]);
-                float avg = static_cast<float>(
-                    sum / (static_cast<double>(clusters[ci].size()) * static_cast<double>(clusters[cj].size())));
-
-                if (avg < best_d) {
-                    best_d = avg;
-                    best_i = ci;
-                    best_j = cj;
-                }
-            }
+    for (size_t t = 0; t < nThreads; ++t)
+        for (auto [i, j] : threadEdges[t]) {
+            size_t pi = find(i), pj = find(j);
+            if (pi != pj) parent[pi] = pj;
         }
-
-        if (best_d >= threshold)
-            break;
-
-        // Merge best_j into best_i.
-        for (size_t idx : clusters[best_j])
-            clusters[best_i].push_back(idx);
-        clusters.erase(clusters.begin() + static_cast<ptrdiff_t>(best_j));
-
-        ++mergesDone;
-        if (progress)
-            progress(70 + mergesDone * 30 / std::max(1, maxMerges));
-    }
     if (progress) progress(100);
 
-    // Build result: only clusters with >= 2 tracks.
+    // Group tracks by root.
+    std::map<size_t, std::vector<size_t>> components;
+    for (size_t i = 0; i < N; ++i)
+        components[find(i)].push_back(i);
+
+    // Build result: only components with >= 2 tracks.
     std::vector<SimilarityGroup> result;
-    for (const auto& cl : clusters) {
-        if (cl.size() < 2) continue;
-
+    for (const auto& [root, members] : components) {
+        if (members.size() < 2) continue;
         SimilarityGroup grp;
-        grp.tracks.reserve(cl.size());
-        for (size_t idx : cl)
+        grp.tracks.reserve(members.size());
+        for (size_t idx : members)
             grp.tracks.push_back(tracks[idx]);
-
         result.push_back(std::move(grp));
     }
 
