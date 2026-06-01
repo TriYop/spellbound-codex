@@ -20,9 +20,13 @@ public:
     // Returns 0.0f for identical analyses; max theoretical ≈ 4.8.
     static float distance(const TrackAnalysis& a, const TrackAnalysis& b);
 
-    // Average-linkage agglomerative clustering.
+    // Threshold-based connected-component clustering (single-linkage via union-find).
     // Returns groups with >= 2 tracks, sorted largest-first.
-    // threshold: merge clusters whose average pairwise distance < threshold.
+    // threshold: two tracks are connected when their distance < threshold.
+    //   ≈ 0.30  — truly identical mastering treatment
+    //   ≈ 0.60  — same preset works well  (recommended default)
+    //   ≈ 0.90  — acceptable result, broader groups
+    //   > 1.50  — very loose; spans clearly different music styles
     // progress: optional callback invoked with 0–100 as work proceeds.
     std::vector<SimilarityGroup> discover(
         const std::vector<Track>& tracks,

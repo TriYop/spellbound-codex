@@ -60,9 +60,9 @@ AutoDiscoverDialog::AutoDiscoverDialog(PresetBuilderCtx& ctx, QWidget* parent)
 
         thresholdSpin_ = new QDoubleSpinBox(this);
         thresholdSpin_->setRange(0.0, 5.0);
-        thresholdSpin_->setSingleStep(0.1);
-        thresholdSpin_->setValue(1.5);
-        thresholdSpin_->setDecimals(1);
+        thresholdSpin_->setSingleStep(0.05);
+        thresholdSpin_->setValue(0.6);
+        thresholdSpin_->setDecimals(2);
         row->addWidget(thresholdSpin_);
 
         row->addWidget(new QLabel("(lower = tighter groups)", this));
