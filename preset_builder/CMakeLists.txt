@@ -4,6 +4,7 @@ add_library(preset_builder_core STATIC
     src/services/stats_service.cpp
     src/services/export_service.cpp
     src/services/ingest_service.cpp
+    src/services/similarity_service.cpp
     src/adapters/database.cpp
     src/adapters/sqlite_track_repository.cpp
     src/adapters/sqlite_preset_repository.cpp

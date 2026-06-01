@@ -1,0 +1,216 @@
+#include "preset_builder/services/similarity_service.hpp"
+
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <limits>
+#include <map>
+#include <numeric>
+#include <string>
+#include <vector>
+
+namespace pb {
+
+// ---------------------------------------------------------------------------
+// distance()
+// ---------------------------------------------------------------------------
+
+float SimilarityService::distance(const TrackAnalysis& a, const TrackAnalysis& b) {
+    float sum = 0.f;
+
+    constexpr float normRms       = 40.f;
+    constexpr float normCorr      = 2.f;
+    constexpr float normTransient = 20.f;
+
+    for (size_t i = 0; i < 7; ++i) {
+        float d;
+        d = (a.bandRmsDb[i] - b.bandRmsDb[i]) / normRms;
+        sum += d * d;
+        d = (a.bandCorr[i] - b.bandCorr[i]) / normCorr;
+        sum += d * d;
+        d = (a.bandTransientDb[i] - b.bandTransientDb[i]) / normTransient;
+        sum += d * d;
+    }
+
+    {
+        float d = (a.overallRmsDb - b.overallRmsDb) / normRms;
+        sum += d * d;
+    }
+    {
+        float d = (a.overallCorr - b.overallCorr) / normCorr;
+        sum += d * d;
+    }
+
+    return std::sqrt(sum);
+}
+
+// ---------------------------------------------------------------------------
+// discover()  — average-linkage agglomerative clustering
+// ---------------------------------------------------------------------------
+
+std::vector<SimilarityGroup> SimilarityService::discover(
+    const std::vector<Track>& tracks,
+    float threshold) const
+{
+    const size_t N = tracks.size();
+    if (N <= 1) return {};
+
+    // Build full N×N distance matrix.
+    std::vector<std::vector<float>> dist(N, std::vector<float>(N, 0.f));
+    for (size_t i = 0; i < N; ++i)
+        for (size_t j = i + 1; j < N; ++j) {
+            float d = distance(tracks[i].analysis, tracks[j].analysis);
+            dist[i][j] = d;
+            dist[j][i] = d;
+        }
+
+    // Each cluster is a vector of original track indices.
+    std::vector<std::vector<size_t>> clusters(N);
+    for (size_t i = 0; i < N; ++i)
+        clusters[i] = {i};
+
+    // Average-linkage: iteratively merge the two closest clusters.
+    while (clusters.size() >= 2) {
+        size_t best_i = 0, best_j = 1;
+        float  best_d = std::numeric_limits<float>::max();
+
+        for (size_t ci = 0; ci < clusters.size(); ++ci) {
+            for (size_t cj = ci + 1; cj < clusters.size(); ++cj) {
+                // Compute average-linkage distance between cluster ci and cj.
+                double sum = 0.0;
+                for (size_t a : clusters[ci])
+                    for (size_t b : clusters[cj])
+                        sum += static_cast<double>(dist[a][b]);
+                float avg = static_cast<float>(
+                    sum / static_cast<double>(clusters[ci].size() * clusters[cj].size()));
+
+                if (avg < best_d) {
+                    best_d = avg;
+                    best_i = ci;
+                    best_j = cj;
+                }
+            }
+        }
+
+        if (best_d >= threshold)
+            break;
+
+        // Merge best_j into best_i.
+        for (size_t idx : clusters[best_j])
+            clusters[best_i].push_back(idx);
+        clusters.erase(clusters.begin() + static_cast<ptrdiff_t>(best_j));
+    }
+
+    // Build result: only clusters with >= 2 tracks.
+    std::vector<SimilarityGroup> result;
+    int groupIndex = 0;
+    for (const auto& cl : clusters) {
+        if (cl.size() < 2) continue;
+
+        SimilarityGroup grp;
+        grp.tracks.reserve(cl.size());
+        for (size_t idx : cl)
+            grp.tracks.push_back(tracks[idx]);
+
+        grp.suggestedName = suggestName(grp.tracks, groupIndex + 1);
+        result.push_back(std::move(grp));
+        ++groupIndex;
+    }
+
+    // Sort largest-first.
+    std::sort(result.begin(), result.end(),
+              [](const SimilarityGroup& a, const SimilarityGroup& b) {
+                  return a.tracks.size() > b.tracks.size();
+              });
+
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// suggestName()
+// ---------------------------------------------------------------------------
+
+static std::string mostFrequentIfDominant(const std::vector<std::string>& items,
+                                           size_t total_with_metadata,
+                                           bool checkDistinct = false,
+                                           size_t distinctThreshold = 5)
+{
+    if (items.empty()) return {};
+    if (total_with_metadata == 0) return {};
+
+    // Count frequencies.
+    std::map<std::string, size_t> freq;
+    for (const auto& s : items)
+        ++freq[s];
+
+    if (checkDistinct && freq.size() >= distinctThreshold)
+        return {};
+
+    // Find most frequent.
+    auto it = std::max_element(freq.begin(), freq.end(),
+                               [](const auto& a, const auto& b) {
+                                   return a.second < b.second;
+                               });
+
+    // Must appear in > 50% of tracks that have metadata.
+    if (it->second * 2 > total_with_metadata)
+        return it->first;
+
+    return {};
+}
+
+std::string SimilarityService::suggestName(const std::vector<Track>& tracks, int fallbackN) {
+    // Collect genres, artists, years from tracks that have them.
+    std::vector<std::string> genres, artists;
+    std::vector<int>         years;
+
+    for (const auto& t : tracks) {
+        if (t.metadata.genre.has_value())
+            genres.push_back(*t.metadata.genre);
+        if (t.metadata.artist.has_value())
+            artists.push_back(*t.metadata.artist);
+        if (t.metadata.year.has_value())
+            years.push_back(*t.metadata.year);
+    }
+
+    // Dominant genre: > 50% of tracks that have genre metadata.
+    std::string dominant_genre = mostFrequentIfDominant(genres, genres.size());
+
+    // Dominant artist: > 50% of tracks with artist metadata AND < 5 distinct artists.
+    std::string dominant_artist = mostFrequentIfDominant(
+        artists, artists.size(), /*checkDistinct=*/true, /*distinctThreshold=*/5);
+
+    // Decade: only if year range <= 15.
+    std::string decade;
+    if (!years.empty()) {
+        int mn = *std::min_element(years.begin(), years.end());
+        int mx = *std::max_element(years.begin(), years.end());
+        if (mx - mn <= 15) {
+            // Median year: sort, lower-middle for even count.
+            std::vector<int> sorted_years = years;
+            std::sort(sorted_years.begin(), sorted_years.end());
+            int median_year = sorted_years[(sorted_years.size() - 1) / 2];
+            int dec = (median_year / 10) * 10;
+            decade = std::to_string(dec) + "s";
+        }
+    }
+
+    // Concatenate non-empty parts: artist genre decade.
+    std::string name;
+    for (const std::string& part : {dominant_artist, dominant_genre, decade}) {
+        if (part.empty()) continue;
+        if (!name.empty()) name += ' ';
+        name += part;
+    }
+
+    // Trim (leading/trailing spaces).
+    const auto first = name.find_first_not_of(' ');
+    if (first == std::string::npos) return "Group " + std::to_string(fallbackN);
+    const auto last = name.find_last_not_of(' ');
+    name = name.substr(first, last - first + 1);
+
+    if (name.empty()) return "Group " + std::to_string(fallbackN);
+    return name;
+}
+
+} // namespace pb
