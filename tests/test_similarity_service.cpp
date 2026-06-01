@@ -26,6 +26,18 @@ static TrackAnalysis makeAnalysis(float rmsOffset = 0.f) {
     return a;
 }
 
+// Bass-heavy spectral tilt at the same overall level — genuinely different shape.
+// Relative shape: {+12, +8, +4, 0, -4, -8, -12} dB vs flat shape of makeAnalysis().
+static TrackAnalysis makeTiltedAnalysis() {
+    TrackAnalysis a;
+    a.bandRmsDb       = {-8.f, -12.f, -16.f, -20.f, -24.f, -28.f, -32.f};
+    a.bandCorr        = {0.9f, 0.8f, 0.7f, 0.6f, 0.5f, 0.4f, 0.3f};
+    a.bandTransientDb = {6.f, 5.f, 4.f, 3.f, 2.f, 1.f, 0.f};
+    a.overallRmsDb    = -20.f;
+    a.overallCorr     = 0.85f;
+    return a;
+}
+
 static Track makeTrack(float rmsOffset = 0.f) {
     Track t;
     t.analysis = makeAnalysis(rmsOffset);
@@ -53,14 +65,15 @@ TEST_CASE("SimilarityService::distance is zero for identical analyses") {
 }
 
 TEST_CASE("SimilarityService::distance is non-zero for different analyses") {
+    // makeAnalysis(0) relative shape: bandRmsDb-overallRmsDb = {-2,0,2,4,6,8,10}.
+    // makeTiltedAnalysis relative shape: {12,8,4,0,-4,-8,-12}.
+    // Shape diffs: {-14,-8,-2,4,10,16,22}; normalized by 40.
+    // sum = (196+64+4+16+100+256+484)/1600 = 1120/1600 = 0.7; sqrt ≈ 0.8367
     TrackAnalysis a = makeAnalysis(0.f);
-    TrackAnalysis b = makeAnalysis(10.f);  // all bandRmsDb +10 dB, overallRms +10
+    TrackAnalysis b = makeTiltedAnalysis();
     float d = SimilarityService::distance(a, b);
     CHECK(d > 0.f);
-    // Each of 7 bandRmsDb diffs = 10/40 = 0.25, squared = 0.0625; ×7 = 0.4375
-    // overallRmsDb diff = 10/40 = 0.25, squared = 0.0625
-    // total sum = 0.5; sqrt ≈ 0.7071
-    CHECK(d == doctest::Approx(std::sqrt(0.5f)).epsilon(0.001f));
+    CHECK(d == doctest::Approx(std::sqrt(0.7f)).epsilon(0.001f));
 }
 
 // ---------------------------------------------------------------------------
@@ -68,32 +81,30 @@ TEST_CASE("SimilarityService::distance is non-zero for different analyses") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("SimilarityService::discover: two similar tracks cluster below threshold") {
-    // Two nearly-identical tracks and one outlier with bandRmsDb all +30 dB.
+    // Two flat-spectrum tracks (distance 0) and one tilted-spectrum outlier
+    // (distance ≈ 0.529). Threshold 0.3 groups the flat pair, excludes the outlier.
     Track t0 = makeTrack(0.f);
-    Track t1 = makeTrack(0.f);   // identical analysis to t0 → distance 0
-    Track t2 = makeTrack(30.f);  // outlier
+    Track t1 = makeTrack(0.f);        // identical spectral shape → distance 0
+    Track t2; t2.analysis = makeTiltedAnalysis();  // different shape → distance ≈ 0.529
 
     SimilarityService svc;
-    auto groups = svc.discover({t0, t1, t2}, 1.0f);
+    auto groups = svc.discover({t0, t1, t2}, 0.5f);
 
     REQUIRE(groups.size() == 1);
     CHECK(groups[0].tracks.size() == 2);
-    // The outlier (t2) must not be in the group.
-    // Verify by checking overallRmsDb of the two group members.
-    for (const auto& t : groups[0].tracks) {
+    for (const auto& t : groups[0].tracks)
         CHECK(t.analysis.overallRmsDb == doctest::Approx(-18.f));
-    }
 }
 
 TEST_CASE("SimilarityService::discover: outlier excluded from group") {
     Track trackA = makeTrack(0.f);
     Track trackB = makeTrack(0.f);
-    Track trackC = makeTrack(30.f);  // outlier
+    Track trackC; trackC.analysis = makeTiltedAnalysis();  // different spectral shape
     // Give trackC a unique hash so we can identify it in the output.
     trackC.id.hash = "outlier-hash";
 
     SimilarityService svc;
-    auto groups = svc.discover({trackA, trackB, trackC}, 1.0f);
+    auto groups = svc.discover({trackA, trackB, trackC}, 0.3f);
 
     REQUIRE(groups.size() == 1);
     const auto& g = groups[0];

@@ -25,7 +25,8 @@ float SimilarityService::distance(const TrackAnalysis& a, const TrackAnalysis& b
 
     for (size_t i = 0; i < 7; ++i) {
         float d;
-        d = (a.bandRmsDb[i] - b.bandRmsDb[i]) / normRms;
+        // Spectral shape: band level relative to overall RMS removes loudness bias.
+        d = ((a.bandRmsDb[i] - a.overallRmsDb) - (b.bandRmsDb[i] - b.overallRmsDb)) / normRms;
         sum += d * d;
         d = (a.bandCorr[i] - b.bandCorr[i]) / normCorr;
         sum += d * d;
@@ -33,10 +34,6 @@ float SimilarityService::distance(const TrackAnalysis& a, const TrackAnalysis& b
         sum += d * d;
     }
 
-    {
-        float d = (a.overallRmsDb - b.overallRmsDb) / normRms;
-        sum += d * d;
-    }
     {
         float d = (a.overallCorr - b.overallCorr) / normCorr;
         sum += d * d;
