@@ -1,12 +1,14 @@
 #include "preset_builder/services/similarity_service.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cmath>
 #include <limits>
 #include <map>
 #include <numeric>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace pb {
@@ -50,26 +52,46 @@ float SimilarityService::distance(const TrackAnalysis& a, const TrackAnalysis& b
 
 std::vector<SimilarityGroup> SimilarityService::discover(
     const std::vector<Track>& tracks,
-    float threshold) const
+    float threshold,
+    std::function<void(int)> progress) const
 {
     const size_t N = tracks.size();
     if (N <= 1) return {};
 
-    // Build full N×N distance matrix.
+    // Build full N×N distance matrix (0–70 % of progress).
+    // Rows are striped round-robin across hardware threads; each thread owns
+    // distinct rows, so no cell is written by more than one thread.
     std::vector<std::vector<float>> dist(N, std::vector<float>(N, 0.f));
-    for (size_t i = 0; i < N; ++i)
-        for (size_t j = i + 1; j < N; ++j) {
-            float d = distance(tracks[i].analysis, tracks[j].analysis);
-            dist[i][j] = d;
-            dist[j][i] = d;
+    {
+        const size_t nThreads = std::max(size_t(1),
+            size_t(std::thread::hardware_concurrency()));
+        std::atomic<size_t> rowsDone{0};
+        std::vector<std::thread> threads(nThreads);
+
+        for (size_t t = 0; t < nThreads; ++t) {
+            threads[t] = std::thread([&, t]() {
+                for (size_t i = t; i < N; i += nThreads) {
+                    for (size_t j = i + 1; j < N; ++j) {
+                        float d = distance(tracks[i].analysis, tracks[j].analysis);
+                        dist[i][j] = d;
+                        dist[j][i] = d;
+                    }
+                    const size_t done = ++rowsDone;
+                    if (progress) progress(static_cast<int>(done * 70 / N));
+                }
+            });
         }
+        for (auto& th : threads) th.join();
+    }
 
     // Each cluster is a vector of original track indices.
     std::vector<std::vector<size_t>> clusters(N);
     for (size_t i = 0; i < N; ++i)
         clusters[i] = {i};
 
-    // Average-linkage: iteratively merge the two closest clusters.
+    // Average-linkage: iteratively merge the two closest clusters (70–100 %).
+    const int maxMerges = static_cast<int>(N) - 1;
+    int mergesDone = 0;
     while (clusters.size() >= 2) {
         size_t best_i = 0, best_j = 1;
         float  best_d = std::numeric_limits<float>::max();
@@ -99,7 +121,12 @@ std::vector<SimilarityGroup> SimilarityService::discover(
         for (size_t idx : clusters[best_j])
             clusters[best_i].push_back(idx);
         clusters.erase(clusters.begin() + static_cast<ptrdiff_t>(best_j));
+
+        ++mergesDone;
+        if (progress)
+            progress(70 + mergesDone * 30 / std::max(1, maxMerges));
     }
+    if (progress) progress(100);
 
     // Build result: only clusters with >= 2 tracks.
     std::vector<SimilarityGroup> result;

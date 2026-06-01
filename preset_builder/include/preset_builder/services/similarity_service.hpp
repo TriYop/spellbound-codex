@@ -2,6 +2,7 @@
 
 #include "preset_builder/domain/track.hpp"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -22,9 +23,11 @@ public:
     // Average-linkage agglomerative clustering.
     // Returns groups with >= 2 tracks, sorted largest-first.
     // threshold: merge clusters whose average pairwise distance < threshold.
+    // progress: optional callback invoked with 0–100 as work proceeds.
     std::vector<SimilarityGroup> discover(
         const std::vector<Track>& tracks,
-        float threshold) const;
+        float threshold,
+        std::function<void(int)> progress = {}) const;
 
     // Suggest a preset name for a group of tracks based on their metadata.
     // Falls back to "Group N" (1-indexed fallback parameter) when no metadata.

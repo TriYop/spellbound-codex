@@ -15,6 +15,7 @@ class QLabel;
 class QLineEdit;
 class QListWidget;
 class QListWidgetItem;
+class QProgressBar;
 class QPushButton;
 class QSplitter;
 class QTableWidget;
@@ -33,6 +34,7 @@ public:
     void setup(std::vector<pb::Track> tracks, float threshold);
 signals:
     void finished(std::vector<pb::SimilarityGroup> groups);
+    void progress(int percent);
 protected:
     void run() override;
 private:
@@ -72,6 +74,7 @@ private:
     QDoubleSpinBox* thresholdSpin_ = nullptr;
     QPushButton*    discoverBtn_   = nullptr;
     QLabel*         statusLbl_     = nullptr;
+    QProgressBar*   progressBar_   = nullptr;
 
     // Splitter
     QListWidget*  groupList_   = nullptr;

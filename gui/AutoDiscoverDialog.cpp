@@ -7,6 +7,7 @@
 
 #include <QCloseEvent>
 #include <QDialogButtonBox>
+#include <QProgressBar>
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
@@ -36,7 +37,8 @@ void DiscoverWorker::setup(std::vector<pb::Track> tracks, float threshold) {
 
 void DiscoverWorker::run() {
     pb::SimilarityService svc;
-    auto groups = svc.discover(tracks_, threshold_);
+    auto groups = svc.discover(tracks_, threshold_,
+        [this](int pct) { emit progress(pct); });
     emit finished(std::move(groups));
 }
 
@@ -73,6 +75,14 @@ AutoDiscoverDialog::AutoDiscoverDialog(PresetBuilderCtx& ctx, QWidget* parent)
 
         vbox->addLayout(row);
     }
+
+    // ── Progress bar (hidden until analysis runs) ─────────────────────────────
+    progressBar_ = new QProgressBar(this);
+    progressBar_->setRange(0, 100);
+    progressBar_->setValue(0);
+    progressBar_->setTextVisible(true);
+    progressBar_->hide();
+    vbox->addWidget(progressBar_);
 
     // ── Splitter ──────────────────────────────────────────────────────────────
     auto* splitter = new QSplitter(Qt::Horizontal, this);
@@ -127,6 +137,8 @@ AutoDiscoverDialog::AutoDiscoverDialog(PresetBuilderCtx& ctx, QWidget* parent)
     worker_ = new DiscoverWorker(this);
     connect(worker_, &DiscoverWorker::finished,
             this,    &AutoDiscoverDialog::onDiscoverFinished);
+    connect(worker_, &DiscoverWorker::progress,
+            progressBar_, &QProgressBar::setValue);
 
     // ── Signal wiring ─────────────────────────────────────────────────────────
     connect(discoverBtn_, &QPushButton::clicked, this, &AutoDiscoverDialog::onDiscover);
@@ -151,6 +163,8 @@ AutoDiscoverDialog::AutoDiscoverDialog(PresetBuilderCtx& ctx, QWidget* parent)
 void AutoDiscoverDialog::onDiscover() {
     discoverBtn_->setEnabled(false);
     statusLbl_->setText("Analysing\xe2\x80\xa6");
+    progressBar_->setValue(0);
+    progressBar_->show();
 
     groups_.clear();
     savedIdx_.clear();
@@ -171,6 +185,7 @@ void AutoDiscoverDialog::onDiscover() {
 }
 
 void AutoDiscoverDialog::onDiscoverFinished(std::vector<pb::SimilarityGroup> groups) {
+    progressBar_->hide();
     discoverBtn_->setEnabled(true);
     groups_ = std::move(groups);
     populateGroupList();
