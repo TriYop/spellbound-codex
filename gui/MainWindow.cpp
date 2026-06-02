@@ -491,7 +491,13 @@ void MainWindow::onExportAdvice() {
             QString("Could not write to %1").arg(dest));
         return;
     }
-    f.write(QByteArray::fromStdString(content));
+    const qint64 written = f.write(QByteArray::fromStdString(content));
+    f.close();
+    if (written < 0 || written != static_cast<qint64>(content.size())) {
+        QMessageBox::warning(this, "Export failed",
+            QString("Could not write to %1").arg(dest));
+        return;
+    }
     statusLabel_->setText(QString::fromUtf8("Advice exported \xe2\x86\x92 %1").arg(dest));
 }
 
