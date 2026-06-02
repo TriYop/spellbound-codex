@@ -92,6 +92,7 @@ private slots:
     void onRenderProgress(float fraction, const QString& stage);
     void onRenderFinished(bool ok, const QString& errorMsg, mt::MasterResult result);
     void onManagePresets();
+    void onExportAdvice();
     void onMidiCC(int channel, int cc, int value);
     void onMidiNoteOn(int channel, int note, int velocity);
 
@@ -104,6 +105,7 @@ private:
     QString                       inputPath_;
     QString                       renderedPath_;
     std::optional<mt::PresetData> currentPreset_;
+    mt::AnalysisSnapshot          lastSnap_;
 
     // ── Widgets ───────────────────────────────────────────────────────────────
     QLabel*           inputLabel_     = nullptr;
@@ -112,6 +114,7 @@ private:
     TransportWidget*  transport_      = nullptr;
     QPushButton*      renderButton_   = nullptr;
     QPushButton*      saveButton_     = nullptr;
+    QPushButton*      exportAdviceBtn_ = nullptr;
     QPushButton*      resetBtn_       = nullptr;
     QComboBox*        bitDepthCombo_  = nullptr;
     QCheckBox*        flacCheck_      = nullptr;

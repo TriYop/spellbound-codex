@@ -10,10 +10,12 @@
 #include "TransportWidget.h"
 #include "VerticalFader.h"
 #include "utils.h"
+#include "mastertweak/report.hpp"
 
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFile>
 #include <QFileDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -136,6 +138,50 @@ void MainWindow::buildUi() {
         vbox->addLayout(row);
     }
 
+    // ── Output format + Render row ────────────────────────────────────────────
+    {
+        auto* row = new QHBoxLayout;
+
+        renderButton_ = new QPushButton("Render", central);
+        saveButton_   = new QPushButton("Save As…", central);
+        renderButton_->setEnabled(false);
+        saveButton_->setEnabled(false);
+
+        exportAdviceBtn_ = new QPushButton(QString::fromUtf8("Export Advice\xe2\x80\xa6"), central);
+        exportAdviceBtn_->setEnabled(false);
+
+        auto* depthLbl = new QLabel("Bit depth:", central);
+        bitDepthCombo_ = new QComboBox(central);
+        bitDepthCombo_->addItem("16-bit", 16);
+        bitDepthCombo_->addItem("24-bit", 24);
+        bitDepthCombo_->addItem("32-bit float", 32);
+        bitDepthCombo_->setCurrentIndex(1);
+
+        flacCheck_ = new QCheckBox("FLAC", central);
+
+        auto* targetLbl = new QLabel("Target:", central);
+        targetCombo_ = new TargetLevelCombo(central);
+
+        statusLabel_ = new QLabel("Ready", central);
+
+        connect(renderButton_, &QPushButton::clicked, this, &MainWindow::onRenderClicked);
+        connect(saveButton_,   &QPushButton::clicked, this, &MainWindow::onSaveAs);
+        connect(exportAdviceBtn_, &QPushButton::clicked, this, &MainWindow::onExportAdvice);
+
+        row->addWidget(renderButton_);
+        row->addWidget(saveButton_);
+        row->addWidget(exportAdviceBtn_);
+        row->addSpacing(16);
+        row->addWidget(depthLbl);
+        row->addWidget(bitDepthCombo_);
+        row->addWidget(flacCheck_);
+        row->addSpacing(8);
+        row->addWidget(targetLbl);
+        row->addWidget(targetCombo_);
+        row->addWidget(statusLabel_, 1);
+        vbox->addLayout(row);
+    }
+
     // ── Chain panel (scrollable) ──────────────────────────────────────────────
     {
         auto* scroll = new QScrollArea(central);
@@ -154,45 +200,6 @@ void MainWindow::buildUi() {
     // ── Transport ─────────────────────────────────────────────────────────────
     transport_ = new TransportWidget(central);
     vbox->addWidget(transport_);
-
-    // ── Output format + Render row ────────────────────────────────────────────
-    {
-        auto* row = new QHBoxLayout;
-
-        renderButton_ = new QPushButton("Render", central);
-        saveButton_   = new QPushButton("Save As…", central);
-        renderButton_->setEnabled(false);
-        saveButton_->setEnabled(false);
-
-        auto* depthLbl = new QLabel("Bit depth:", central);
-        bitDepthCombo_ = new QComboBox(central);
-        bitDepthCombo_->addItem("16-bit", 16);
-        bitDepthCombo_->addItem("24-bit", 24);
-        bitDepthCombo_->addItem("32-bit float", 32);
-        bitDepthCombo_->setCurrentIndex(1);
-
-        flacCheck_ = new QCheckBox("FLAC", central);
-
-        auto* targetLbl = new QLabel("Target:", central);
-        targetCombo_ = new TargetLevelCombo(central);
-
-        statusLabel_ = new QLabel("Ready", central);
-
-        connect(renderButton_, &QPushButton::clicked, this, &MainWindow::onRenderClicked);
-        connect(saveButton_,   &QPushButton::clicked, this, &MainWindow::onSaveAs);
-
-        row->addWidget(renderButton_);
-        row->addWidget(saveButton_);
-        row->addSpacing(16);
-        row->addWidget(depthLbl);
-        row->addWidget(bitDepthCombo_);
-        row->addWidget(flacCheck_);
-        row->addSpacing(8);
-        row->addWidget(targetLbl);
-        row->addWidget(targetCombo_);
-        row->addWidget(statusLabel_, 1);
-        vbox->addLayout(row);
-    }
 
     analysisWorker_ = new AnalysisWorker(this);
     connect(analysisWorker_, &AnalysisWorker::finished,
@@ -268,6 +275,7 @@ void MainWindow::setInputFile(const QString& path) {
     renderedPath_.clear();
     saveButton_->setEnabled(false);
     renderButton_->setEnabled(false);
+    exportAdviceBtn_->setEnabled(false);
     resetBtn_->setEnabled(false);
     startAnalysis();
 }
@@ -302,6 +310,8 @@ void MainWindow::onAnalysisFinished(bool ok, const QString& errorMsg,
         return;
     }
     chainPanel_->setAdvice(result.advice, result.analysis, *currentPreset_);
+    lastSnap_ = result.analysis;
+    exportAdviceBtn_->setEnabled(true);
     resetBtn_->setEnabled(true);
     statusLabel_->setText(QString::fromUtf8("Analysis complete \xe2\x80\x94 ready to render"));
     renderButton_->setEnabled(true);
@@ -362,6 +372,7 @@ void MainWindow::onRenderFinished(bool ok, const QString& errorMsg, mt::MasterRe
     transport_->loadFile(renderedPath_);
 
     chainPanel_->setAdvice(result.advice, result.analysis, *currentPreset_);
+    lastSnap_ = result.analysis;
 }
 
 void MainWindow::onSaveAs() {
@@ -450,6 +461,38 @@ void MainWindow::onMidiNoteOn(int channel, int note, int /*velocity*/) {
         transport_->play();
     if (nb1.note == note && (nb1.channel < 0 || nb1.channel == channel))
         transport_->stop();
+}
+
+void MainWindow::onExportAdvice() {
+    if (!currentPreset_) return;
+
+    const QString defaultPath = [this]() -> QString {
+        if (inputPath_.isEmpty()) return "advice.md";
+        const fs::path p{inputPath_.toStdString()};
+        const std::string stem = p.stem().string() + "_advice";
+        return QString::fromStdString(
+            (p.parent_path() / (stem + ".md")).string());
+    }();
+
+    const QString dest = QFileDialog::getSaveFileName(
+        this, "Export Advice", defaultPath,
+        "Markdown Files (*.md);;All Files (*)");
+    if (dest.isEmpty()) return;
+
+    const std::string content = mt::formatAdviceMarkdown(
+        lastSnap_,
+        chainPanel_->currentAdvice(),
+        *currentPreset_,
+        inputPath_.toStdString());
+
+    QFile f(dest);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Export failed",
+            QString("Could not write to %1").arg(dest));
+        return;
+    }
+    f.write(QByteArray::fromStdString(content));
+    statusLabel_->setText(QString::fromUtf8("Advice exported \xe2\x86\x92 %1").arg(dest));
 }
 
 } // namespace gui
