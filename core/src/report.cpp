@@ -1,0 +1,128 @@
+#include "mastertweak/report.hpp"
+
+#include <ctime>
+#include <iomanip>
+#include <sstream>
+
+namespace mt {
+
+namespace {
+
+std::string today() {
+    std::time_t t = std::time(nullptr);
+    std::tm* tm = std::localtime(&t);
+    std::ostringstream oss;
+    oss << std::put_time(tm, "%Y-%m-%d");
+    return oss.str();
+}
+
+// Format a float with explicit +/- sign (for gain/threshold values).
+std::string fmtDb(float v, int prec = 1) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(prec);
+    if (v >= 0.f) oss << '+';
+    oss << v;
+    return oss.str();
+}
+
+// Format a plain float (no sign prefix).
+std::string fmtF(float v, int prec = 1) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(prec) << v;
+    return oss.str();
+}
+
+} // namespace
+
+std::string formatAdviceMarkdown(
+    const AnalysisSnapshot& snap,
+    const AdviceSet&        advice,
+    const PresetData&       preset,
+    const std::string&      inputFilename)
+{
+    std::ostringstream md;
+
+    // ── Header ────────────────────────────────────────────────────────────────
+    md << "# MasterTweak Advice Export\n\n";
+    md << "**File:** " << inputFilename << "  \n";
+    md << "**Preset:** " << preset.name << "  \n";
+    md << "**Date:** " << today() << "\n\n";
+    if (!preset.description.empty())
+        md << "> " << preset.description << "\n\n";
+
+    // ── Analysis ──────────────────────────────────────────────────────────────
+    md << "## Analysis — Measured Values\n\n";
+    md << "| Band    | RMS (dBFS) | Crest (dB) | L/R Corr |\n";
+    md << "| ------- | ---------- | ---------- | -------- |\n";
+    for (int i = 0; i < AnalysisSnapshot::kNumBands; ++i) {
+        const auto& b = snap.bands[i];
+        md << "| " << std::left  << std::setw(7) << AnalysisSnapshot::kBandNames[i]
+           << " | " << std::right << std::setw(10) << fmtDb(b.avgRmsDb)
+           << " | " << std::setw(10) << fmtF(b.crestDb)
+           << " | " << std::setw(8)  << fmtF(b.correlation, 2) << " |\n";
+    }
+    md << "\n**Overall:** RMS " << fmtDb(snap.overallAvgDb)
+       << " dBFS · Correlation " << fmtF(snap.overallCorr, 2) << "\n\n";
+
+    // ── EQ ────────────────────────────────────────────────────────────────────
+    md << "## 7-Band EQ\n\n";
+    md << "| Band    | Freq (Hz) | Gain (dB) | Q    | Type  |\n";
+    md << "| ------- | --------- | --------- | ---- | ----- |\n";
+    for (int i = 0; i < AdviceSet::kNumBands; ++i) {
+        const auto& eq = advice.eq[i];
+        md << "| " << std::left  << std::setw(7) << AnalysisSnapshot::kBandNames[i]
+           << " | " << std::right << std::setw(9) << fmtF(eq.freqHz, 0)
+           << " | " << std::setw(9) << fmtDb(eq.gainDb)
+           << " | " << std::setw(4) << fmtF(eq.q, 2)
+           << " | " << std::left  << std::setw(5) << (eq.isShelf ? "Shelf" : "Bell") << " |\n";
+    }
+    md << "\n";
+
+    // ── Multiband comp ────────────────────────────────────────────────────────
+    md << "## Multiband Compression\n\n";
+    md << "| Band    | Threshold (dB) | Ratio | Attack (ms) | Release (ms) |\n";
+    md << "| ------- | -------------- | ----- | ----------- | ------------ |\n";
+    for (int i = 0; i < AdviceSet::kNumBands; ++i) {
+        const auto& c = advice.mbComp[i];
+        md << "| " << std::left  << std::setw(7) << AnalysisSnapshot::kBandNames[i]
+           << " | " << std::right << std::setw(14) << fmtDb(c.thresholdDb)
+           << " | " << std::setw(5)  << fmtF(c.ratio, 1)
+           << " | " << std::setw(11) << fmtF(c.attackMs, 0)
+           << " | " << std::setw(12) << fmtF(c.releaseMs, 0) << " |\n";
+    }
+    md << "\n";
+
+    // ── Stereo width ──────────────────────────────────────────────────────────
+    md << "## Stereo Width\n\n";
+    md << "| Band    | Width |\n";
+    md << "| ------- | ----- |\n";
+    for (int i = 0; i < AdviceSet::kNumBands; ++i) {
+        md << "| " << std::left  << std::setw(7) << AnalysisSnapshot::kBandNames[i]
+           << " | " << std::right << std::setw(5) << fmtF(advice.width[i].width, 2) << " |\n";
+    }
+    md << "\n";
+
+    // ── Mixbus comp ───────────────────────────────────────────────────────────
+    const auto& mb = advice.mixbusComp;
+    md << "## Mixbus Compressor\n\n";
+    md << "| Threshold (dB) | Ratio | Attack (ms) | Release (ms) | Makeup (dB) |\n";
+    md << "| -------------- | ----- | ----------- | ------------ | ----------- |\n";
+    md << "| " << std::right << std::setw(14) << fmtDb(mb.thresholdDb)
+       << " | " << std::setw(5)  << fmtF(mb.ratio, 1)
+       << " | " << std::setw(11) << fmtF(mb.attackMs, 0)
+       << " | " << std::setw(12) << fmtF(mb.releaseMs, 0)
+       << " | " << std::setw(11) << fmtDb(mb.makeupDb) << " |\n\n";
+
+    // ── Saturator ─────────────────────────────────────────────────────────────
+    md << "## Saturation\n\n";
+    md << "**Drive:** " << fmtF(advice.saturator.driveDb) << " dB\n\n";
+
+    // ── Limiter ───────────────────────────────────────────────────────────────
+    md << "## Limiter\n\n";
+    md << "**Target:** " << fmtF(advice.limiter.targetLufsApprox) << " LUFS"
+       << " · **True-Peak Ceiling:** " << fmtDb(advice.limiter.ceilingDb) << " dBTP\n";
+
+    return md.str();
+}
+
+} // namespace mt
