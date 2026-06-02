@@ -1,6 +1,7 @@
 #include "mastertweak/report.hpp"
 
-#include <ctime>
+#include <cmath>
+#include <chrono>
 #include <iomanip>
 #include <sstream>
 
@@ -9,10 +10,14 @@ namespace mt {
 namespace {
 
 std::string today() {
-    std::time_t t = std::time(nullptr);
-    std::tm* tm = std::localtime(&t);
+    const auto now = std::chrono::system_clock::now();
+    const auto dp  = std::chrono::floor<std::chrono::days>(now);
+    const std::chrono::year_month_day ymd{dp};
     std::ostringstream oss;
-    oss << std::put_time(tm, "%Y-%m-%d");
+    oss << std::setfill('0')
+        << static_cast<int>(ymd.year())            << '-'
+        << std::setw(2) << static_cast<unsigned>(ymd.month()) << '-'
+        << std::setw(2) << static_cast<unsigned>(ymd.day());
     return oss.str();
 }
 
@@ -20,7 +25,7 @@ std::string today() {
 std::string fmtDb(float v, int prec = 1) {
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(prec);
-    if (v >= 0.f) oss << '+';
+    if (v >= 0.f && !std::signbit(v)) oss << '+';
     oss << v;
     return oss.str();
 }
