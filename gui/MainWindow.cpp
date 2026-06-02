@@ -297,6 +297,7 @@ void MainWindow::startAnalysis() {
     statusLabel_->setText(QString::fromUtf8("Analysing\xe2\x80\xa6"));
     renderButton_->setEnabled(false);
     if (resetBtn_) resetBtn_->setEnabled(false);
+    exportAdviceBtn_->setEnabled(false);
     analysisWorker_->setup(inputPath_.toStdString(), *currentPreset_, seq);
     analysisWorker_->start();
 }
@@ -368,6 +369,7 @@ void MainWindow::onRenderFinished(bool ok, const QString& errorMsg, mt::MasterRe
     }
 
     saveButton_->setEnabled(true);
+    exportAdviceBtn_->setEnabled(true);
     statusLabel_->setText(QString("Rendered \xe2\x86\x92 %1").arg(renderedPath_));
     transport_->loadFile(renderedPath_);
 
@@ -486,7 +488,7 @@ void MainWindow::onExportAdvice() {
         inputPath_.toStdString());
 
     QFile f(dest);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    if (!f.open(QIODevice::WriteOnly)) {
         QMessageBox::warning(this, "Export failed",
             QString("Could not write to %1").arg(dest));
         return;
