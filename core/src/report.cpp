@@ -69,6 +69,24 @@ std::string formatAdviceMarkdown(
     md << "\n**Overall:** RMS " << fmtDb(snap.overallAvgDb)
        << " dBFS · Correlation " << fmtF(snap.overallCorr, 2) << "\n\n";
 
+    // ── Resonance EQ ─────────────────────────────────────────────────────────
+    md << "## Resonance EQ\n\n";
+    if (advice.resonances.empty()) {
+        md << "_No resonances detected._\n\n";
+    } else {
+        md << "| #  | Freq (Hz) | Q    | Gain (dB) | Active |\n";
+        md << "| -- | --------- | ---- | --------- | ------ |\n";
+        for (int i = 0; i < static_cast<int>(advice.resonances.size()); ++i) {
+            const auto& peak = advice.resonances[i];
+            md << "| " << std::right << std::setw(2) << (i + 1)
+               << " | " << std::setw(9) << fmtF(peak.freqHz, 0)
+               << " | " << std::setw(4) << fmtF(peak.q, 1)
+               << " | " << std::setw(9) << fmtDb(peak.gainDb)
+               << " | " << std::left  << std::setw(6) << (peak.enabled ? "yes" : "no") << " |\n";
+        }
+        md << "\n";
+    }
+
     // ── EQ ────────────────────────────────────────────────────────────────────
     md << "## 7-Band EQ\n\n";
     md << "| Band    | Freq (Hz) | Gain (dB) | Q    | Type  |\n";
