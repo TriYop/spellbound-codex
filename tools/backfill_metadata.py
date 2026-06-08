@@ -165,14 +165,9 @@ def extract_tags(path: str) -> dict:
         return {}
 
 
-def backfill(db_path: str, dry_run: bool) -> None:
-    conn = sqlite3.connect(db_path)
-    # Some paths were stored with non-UTF-8 encoding (e.g. latin-1 filenames).
-    # surrogateescape lets us round-trip them to mutagen without crashing.
-    conn.text_factory = lambda b: b.decode("utf-8", errors="surrogateescape")
-    conn.row_factory = sqlite3.Row
+def _backfill_embedded(conn: sqlite3.Connection, dry_run: bool) -> tuple[int, int, int]:
+    """Pass 1: fill missing fields from embedded audio tags. Returns (updated, skipped, failed)."""
     cur = conn.cursor()
-
     rows = cur.execute(
         "SELECT t.id, t.path, tm.title, tm.artist, tm.album, tm.genre, tm.year "
         "FROM tracks t JOIN track_metadata tm ON t.id = tm.track_id "
@@ -216,10 +211,28 @@ def backfill(db_path: str, dry_run: bool) -> None:
 
     if not dry_run:
         conn.commit()
+
+    return updated, skipped, failed
+
+
+def backfill(db_path: str, dry_run: bool, online: bool = True) -> None:
+    conn = sqlite3.connect(db_path)
+    conn.text_factory = lambda b: b.decode("utf-8", errors="surrogateescape")
+    conn.row_factory = sqlite3.Row
+
+    p1_updated, p1_skipped, p1_failed = _backfill_embedded(conn, dry_run)
+
+    p2_updated = p2_skipped = p2_failed = 0
+    if online:
+        p2_updated, p2_skipped, p2_failed = backfill_online(conn, dry_run)
+
     conn.close()
 
     suffix = " (dry run)" if dry_run else ""
-    print(f"\nDone{suffix}: updated {updated}, skipped {skipped}, failed {failed}")
+    print(f"\nDone{suffix}:")
+    print(f"  Pass 1 (embedded tags): updated {p1_updated}, skipped {p1_skipped}, failed {p1_failed}")
+    if online:
+        print(f"  Pass 2 (MusicBrainz):   updated {p2_updated}, skipped {p2_skipped}, failed {p2_failed}")
 
 
 def main():
@@ -227,6 +240,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", default=str(default_db), help="Path to preset_builder.db")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes without writing")
+    parser.add_argument("--no-online", action="store_true", help="Skip MusicBrainz pass")
     args = parser.parse_args()
 
     if not Path(args.db).exists():
@@ -234,7 +248,7 @@ def main():
         raise SystemExit(1)
 
     print(f"DB: {args.db}" + (" [dry run]" if args.dry_run else ""))
-    backfill(args.db, args.dry_run)
+    backfill(args.db, args.dry_run, online=not args.no_online)
 
 
 if __name__ == "__main__":
