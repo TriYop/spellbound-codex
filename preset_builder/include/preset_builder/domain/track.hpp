@@ -12,7 +12,7 @@ struct TrackId {
     bool operator==(const TrackId&) const = default;
 };
 
-enum class MetadataSource { acoustid, filename };
+enum class MetadataSource { acoustid, embedded_tags, filename };
 
 struct TrackMetadata {
     std::optional<std::string> title;

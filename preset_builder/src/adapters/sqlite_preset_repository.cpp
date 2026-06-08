@@ -117,8 +117,9 @@ std::vector<Track> SqlitePresetRepository::tracksFor(const PresetId& id) const {
         t.metadata.genre  = optCol(6);
         if (sqlite3_column_type(st, 7) != SQLITE_NULL)
             t.metadata.year = sqlite3_column_int(st, 7);
-        t.metadata.source = col(8) == "acoustid"
-            ? MetadataSource::acoustid : MetadataSource::filename;
+        t.metadata.source = col(8) == "acoustid"      ? MetadataSource::acoustid
+                          : col(8) == "embedded_tags"  ? MetadataSource::embedded_tags
+                          : MetadataSource::filename;
 
         t.analysis.bandRmsDb       = jsonToArr(col(9));
         t.analysis.bandCorr        = jsonToArr(col(10));

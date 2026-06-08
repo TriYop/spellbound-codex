@@ -36,11 +36,15 @@ static std::string optStr(const std::optional<std::string>& o) {
 }
 
 static std::string sourceStr(MetadataSource s) {
-    return s == MetadataSource::acoustid ? "acoustid" : "filename";
+    if (s == MetadataSource::acoustid)     return "acoustid";
+    if (s == MetadataSource::embedded_tags) return "embedded_tags";
+    return "filename";
 }
 
 static MetadataSource sourceFrom(const std::string& s) {
-    return s == "acoustid" ? MetadataSource::acoustid : MetadataSource::filename;
+    if (s == "acoustid")      return MetadataSource::acoustid;
+    if (s == "embedded_tags") return MetadataSource::embedded_tags;
+    return MetadataSource::filename;
 }
 
 // ── row builder ───────────────────────────────────────────────────────────────
