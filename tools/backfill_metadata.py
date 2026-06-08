@@ -73,6 +73,72 @@ def search_musicbrainz(title: str, artist: str) -> dict:
         return {}
 
 
+def backfill_online(conn: sqlite3.Connection, dry_run: bool) -> tuple[int, int, int]:
+    """Pass 2: query MusicBrainz for rows still missing fields. Returns (updated, skipped, failed)."""
+    try:
+        import musicbrainzngs  # noqa: F401
+    except ImportError:
+        print("Pass 2 skipped: musicbrainzngs not installed (pip install musicbrainzngs)")
+        return 0, 0, 0
+
+    cur = conn.cursor()
+    rows = cur.execute(
+        "SELECT t.id, t.path, tm.title, tm.artist, tm.album, tm.genre, tm.year "
+        "FROM tracks t JOIN track_metadata tm ON t.id = tm.track_id "
+        "WHERE tm.genre IS NULL OR tm.genre = '' OR tm.year IS NULL"
+    ).fetchall()
+
+    updated = skipped = failed = 0
+
+    for row in rows:
+        track_id = row["id"]
+        path = row["path"]
+
+        title = row["title"] or ""
+        artist = row["artist"] or ""
+        if not title or not artist:
+            stem_artist, stem_title = parse_filename_stem(path)
+            if not title:
+                title = stem_title
+            if not artist:
+                artist = stem_artist
+
+        if not title:
+            skipped += 1
+            continue
+
+        fields = search_musicbrainz(title, artist)
+        if not fields:
+            skipped += 1
+            continue
+
+        updates = {}
+        for field in ("title", "artist", "album", "genre"):
+            if is_empty(row[field]) and fields.get(field):
+                updates[field] = fields[field]
+        if is_empty(row["year"]) and "year" in fields:
+            updates["year"] = fields["year"]
+
+        if not updates:
+            skipped += 1
+            continue
+
+        if dry_run:
+            print(f"  DRY-RUN  {Path(path).name}: {updates}")
+        else:
+            set_clause = ", ".join(f"{k} = ?" for k in updates)
+            vals = list(updates.values()) + [track_id]
+            cur.execute(f"UPDATE track_metadata SET {set_clause} WHERE track_id = ?", vals)
+        updated += 1
+
+        time.sleep(1)
+
+    if not dry_run:
+        conn.commit()
+
+    return updated, skipped, failed
+
+
 def extract_tags(path: str) -> dict:
     """Read embedded tags with mutagen. Returns {} if file unreadable."""
     try:
