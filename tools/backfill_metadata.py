@@ -26,6 +26,53 @@ def parse_filename_stem(path: str) -> tuple[str, str]:
     return "", stem.strip()
 
 
+def search_musicbrainz(title: str, artist: str) -> dict:
+    """Query MusicBrainz text search. Returns dict of non-empty fields, or {} on any failure."""
+    try:
+        import musicbrainzngs
+        musicbrainzngs.set_useragent("MasterTweak", "0.1", "yvan.janet@gmail.com")
+    except ImportError:
+        return {}
+
+    try:
+        result = musicbrainzngs.search_recordings(recording=title, artist=artist, limit=1)
+        recordings = result.get("recording-list", [])
+        if not recordings:
+            return {}
+        rec = recordings[0]
+        fields: dict = {}
+
+        if rec.get("title"):
+            fields["title"] = rec["title"]
+
+        credits = rec.get("artist-credit", [])
+        if credits and isinstance(credits[0], dict):
+            name = credits[0].get("artist", {}).get("name", "")
+            if name:
+                fields["artist"] = name
+
+        date = rec.get("first-release-date", "")
+        if len(date) >= 4:
+            try:
+                fields["year"] = int(date[:4])
+            except ValueError:
+                pass
+
+        releases = rec.get("release-list", [])
+        if releases and releases[0].get("title"):
+            fields["album"] = releases[0]["title"]
+
+        tags = rec.get("tag-list", [])
+        if tags:
+            top = max(tags, key=lambda t: int(t.get("count", 0)))
+            if top.get("name"):
+                fields["genre"] = top["name"]
+
+        return fields
+    except Exception:
+        return {}
+
+
 def extract_tags(path: str) -> dict:
     """Read embedded tags with mutagen. Returns {} if file unreadable."""
     try:
