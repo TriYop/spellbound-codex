@@ -3,12 +3,27 @@
 
 import argparse
 import sqlite3
+import time
 from pathlib import Path
 
 
 def is_empty(val) -> bool:
     """True if DB value is NULL or empty string."""
     return val is None or val == ""
+
+
+def parse_filename_stem(path: str) -> tuple[str, str]:
+    """Return (artist, title) parsed from the filename stem.
+
+    Splits on ' - ' or ' – ' (en-dash), mirroring C++ parseFilenameMetadata.
+    Returns ('', stem) when no separator is found.
+    """
+    stem = Path(path).stem
+    for sep in (" - ", " – "):
+        if sep in stem:
+            artist, _, title = stem.partition(sep)
+            return artist.strip(), title.strip()
+    return "", stem.strip()
 
 
 def extract_tags(path: str) -> dict:
