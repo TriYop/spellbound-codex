@@ -7,6 +7,7 @@
 
 #include <cmath>
 
+#include <QCheckBox>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -28,6 +29,51 @@ void ChainPanel::buildUi() {
     auto* grid = new QGridLayout;
     for (int c = 0; c < 6; ++c)
         grid->setColumnStretch(c, 1);
+
+    // ── Tier 0: Resonance EQ ─────────────────────────────────────────────────
+    {
+        resBox_ = new QGroupBox("Resonance EQ", this);
+        resBox_->setCheckable(true);
+        resBox_->setChecked(false);
+
+        auto* content = new QWidget(resBox_);
+        auto* vbox    = new QVBoxLayout(resBox_);
+        vbox->addWidget(content);
+
+        auto* innerVbox = new QVBoxLayout(content);
+        innerVbox->setContentsMargins(0, 0, 0, 0);
+        innerVbox->setSpacing(2);
+
+        resNoResLabel_ = new QLabel("No resonances detected", content);
+        resNoResLabel_->setStyleSheet("color: #888; font-style: italic;");
+        innerVbox->addWidget(resNoResLabel_);
+
+        for (int i = 0; i < kMaxResonances; ++i) {
+            auto* row  = new QWidget(content);
+            auto* hbox = new QHBoxLayout(row);
+            hbox->setContentsMargins(0, 0, 0, 0);
+            hbox->setSpacing(6);
+
+            resRowLabels_[i] = new QLabel(row);
+            resRowLabels_[i]->setStyleSheet("font-size: 9pt;");
+            hbox->addWidget(resRowLabels_[i]);
+
+            resRowChecks_[i] = new QCheckBox("enable", row);
+            resRowChecks_[i]->setChecked(true);
+            hbox->addWidget(resRowChecks_[i]);
+            hbox->addStretch();
+
+            resRowLabels_[i]->setVisible(false);
+            resRowChecks_[i]->setVisible(false);
+            innerVbox->addWidget(row);
+
+            connect(resRowChecks_[i], &QCheckBox::toggled,
+                    this, [this](bool) { emitOverride(); });
+        }
+
+        connect(resBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
+        grid->addWidget(resBox_, 0, 0, 1, 6);
+    }
 
     // ── Tier 1: EQ ────────────────────────────────────────────────────────────
     {
@@ -65,7 +111,7 @@ void ChainPanel::buildUi() {
                     this, [this](double) { emitOverride(); });
         }
         connect(eqBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(eqBox_, 0, 0, 1, 6);
+        grid->addWidget(eqBox_, 1, 0, 1, 6);
     }
 
     // ── Tier 2 col 0-1: Multiband Comp ───────────────────────────────────────
@@ -83,7 +129,7 @@ void ChainPanel::buildUi() {
         vbox->addStretch();
 
         connect(mbBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(mbBox_, 1, 0, 1, 2);
+        grid->addWidget(mbBox_, 2, 0, 1, 2);
     }
 
     // ── Tier 2 col 2-3: Stereo Width ─────────────────────────────────────────
@@ -101,7 +147,7 @@ void ChainPanel::buildUi() {
         vbox->addStretch();
 
         connect(widthBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(widthBox_, 1, 2, 1, 2);
+        grid->addWidget(widthBox_, 2, 2, 1, 2);
     }
 
     // ── Tier 2 col 4-5: Saturator ────────────────────────────────────────────
@@ -129,7 +175,7 @@ void ChainPanel::buildUi() {
         connect(satDriveKnob_, &AudioControl::valueChanged,
                 this, [this](double) { emitOverride(); });
         connect(satBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(satBox_, 1, 4, 1, 2);
+        grid->addWidget(satBox_, 2, 4, 1, 2);
     }
 
     // ── Tier 3 col 0-3: Mixbus Comp ──────────────────────────────────────────
@@ -177,7 +223,7 @@ void ChainPanel::buildUi() {
         connect(mixbusMakeupKnob_, &AudioControl::valueChanged,
                 this, [this](double) { emitOverride(); });
         connect(mixbusBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(mixbusBox_, 2, 0, 1, 4);
+        grid->addWidget(mixbusBox_, 3, 0, 1, 4);
     }
 
     // ── Tier 3 col 4-5: Limiter ──────────────────────────────────────────────
@@ -206,7 +252,7 @@ void ChainPanel::buildUi() {
         connect(limCeilingFader_, &AudioControl::valueChanged,
                 this, [this](double) { emitOverride(); });
         connect(limBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(limBox_, 2, 4, 1, 2);
+        grid->addWidget(limBox_, 3, 4, 1, 2);
     }
 
     outer->addLayout(grid);
@@ -249,6 +295,34 @@ void ChainPanel::setAdvice(const mt::AdviceSet& advice,
 
     applyToControls(advice);
 
+    // ── Resonance EQ rows ─────────────────────────────────────────────────────
+    {
+        const int nRes = static_cast<int>(advice.resonances.size());
+        resNoResLabel_->setVisible(nRes == 0);
+        resBox_->blockSignals(true);
+        resBox_->setChecked(nRes > 0);
+        resBox_->blockSignals(false);
+
+        for (int i = 0; i < kMaxResonances; ++i) {
+            if (i < nRes) {
+                const auto& p = advice.resonances[static_cast<size_t>(i)];
+                resRowLabels_[i]->setText(
+                    QString("%1 Hz  Q:%2  %3 dB")
+                        .arg(static_cast<int>(p.freqHz))
+                        .arg(static_cast<double>(p.q), 0, 'f', 1)
+                        .arg(static_cast<double>(p.gainDb), 0, 'f', 1));
+                resRowChecks_[i]->blockSignals(true);
+                resRowChecks_[i]->setChecked(p.enabled);
+                resRowChecks_[i]->blockSignals(false);
+                resRowLabels_[i]->setVisible(true);
+                resRowChecks_[i]->setVisible(true);
+            } else {
+                resRowLabels_[i]->setVisible(false);
+                resRowChecks_[i]->setVisible(false);
+            }
+        }
+    }
+
     // EQ per-band readouts: "preset target → measured RMS"
     for (int i = 0; i < kNumBands; ++i) {
         const auto si = static_cast<size_t>(i);
@@ -285,10 +359,13 @@ mt::AdviceSet ChainPanel::currentAdvice() const {
     adv.saturator.driveDb      = static_cast<float>(satDriveKnob_->value());
     adv.mixbusComp.thresholdDb = static_cast<float>(mixbusThreshKnob_->value());
     adv.mixbusComp.makeupDb    = static_cast<float>(mixbusMakeupKnob_->value());
+    for (int i = 0; i < static_cast<int>(adv.resonances.size()); ++i)
+        adv.resonances[static_cast<size_t>(i)].enabled = resRowChecks_[i]->isChecked();
     return adv;
 }
 
 void ChainPanel::populateBypassFlags(mt::RenderOptions& opts) const {
+    if (resBox_) opts.bypassResonanceEq = !resBox_->isChecked();
     opts.bypassEq         = !eqBox_->isChecked();
     opts.bypassMbComp     = !mbBox_->isChecked();
     opts.bypassSaturator  = !satBox_->isChecked();
@@ -307,6 +384,28 @@ void ChainPanel::resetToAdvice() {
         box->setChecked(true);
         box->blockSignals(false);
     }
+
+    // Re-populate resonance section from autoAdvice_
+    {
+        const int nRes = static_cast<int>(autoAdvice_.resonances.size());
+        resNoResLabel_->setVisible(nRes == 0);
+        resBox_->blockSignals(true);
+        resBox_->setChecked(nRes > 0);
+        resBox_->blockSignals(false);
+
+        for (int i = 0; i < kMaxResonances; ++i) {
+            if (i < nRes) {
+                resRowChecks_[i]->blockSignals(true);
+                resRowChecks_[i]->setChecked(autoAdvice_.resonances[static_cast<size_t>(i)].enabled);
+                resRowChecks_[i]->blockSignals(false);
+                resRowLabels_[i]->setVisible(true);
+                resRowChecks_[i]->setVisible(true);
+            } else {
+                resRowLabels_[i]->setVisible(false);
+                resRowChecks_[i]->setVisible(false);
+            }
+        }
+    }
 }
 
 void ChainPanel::clear() {
@@ -319,6 +418,16 @@ void ChainPanel::clear() {
         box->blockSignals(true);
         box->setChecked(true);
         box->blockSignals(false);
+    }
+
+    // Reset resonance section
+    resBox_->blockSignals(true);
+    resBox_->setChecked(false);
+    resBox_->blockSignals(false);
+    resNoResLabel_->setVisible(true);
+    for (int i = 0; i < kMaxResonances; ++i) {
+        resRowLabels_[i]->setVisible(false);
+        resRowChecks_[i]->setVisible(false);
     }
 
     const QString dash = QString::fromUtf8("\xe2\x80\x94");

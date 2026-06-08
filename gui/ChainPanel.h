@@ -5,6 +5,7 @@
 #include "mastertweak/pipeline.hpp"
 #include "mastertweak/preset.hpp"
 
+#include <QCheckBox>
 #include <QWidget>
 
 QT_BEGIN_NAMESPACE
@@ -64,6 +65,13 @@ private:
 
     mt::AdviceSet autoAdvice_;
     bool          hasAdvice_ = false;
+
+    // Resonance EQ section (Tier 0, above EQ)
+    static constexpr int kMaxResonances = 8;
+    QGroupBox*  resBox_              = nullptr;
+    QLabel*     resNoResLabel_       = nullptr;     // "No resonances detected"
+    QLabel*     resRowLabels_[kMaxResonances]{};    // "4127 Hz  Q:8.3  -6.2 dB"
+    QCheckBox*  resRowChecks_[kMaxResonances]{};    // per-resonance enable/disable
 
     // EQ section (Tier 1)
     QGroupBox*     eqBox_                = nullptr;
