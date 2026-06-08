@@ -133,6 +133,7 @@ static mt::RenderOptions buildRenderOpts(int bitDepth, bool flac,
     opts.outputFlac     = flac;
     for (const auto& s : bypasses) {
         if      (s == "eq")         opts.bypassEq         = true;
+        else if (s == "resonance")  opts.bypassResonanceEq = true;
         else if (s == "multiband")  opts.bypassMbComp     = true;
         else if (s == "saturator")  opts.bypassSaturator  = true;
         else if (s == "width")      opts.bypassWidth      = true;
@@ -172,7 +173,7 @@ int main(int argc, char** argv) {
     std::vector<std::string> bypasses;
     app.add_option("--bypass", bypasses,
                    "Stages to bypass (repeat or space-separate): "
-                   "eq multiband saturator width mixbuscomp limiter dither");
+                   "eq resonance multiband saturator width mixbuscomp limiter dither");
 
     // ── Target level ─────────────────────────────────────────────────────────
     std::string targetLevelName;
