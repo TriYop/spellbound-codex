@@ -13,6 +13,7 @@ add_executable(mastertweak_tests
     test_codec_correction.cpp
     test_midi_mapping.cpp
     test_similarity_service.cpp
+    test_resonance_detector.cpp
 )
 
 target_link_libraries(mastertweak_tests
