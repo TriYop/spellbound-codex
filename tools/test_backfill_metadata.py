@@ -1,10 +1,11 @@
+import sqlite3
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from backfill_metadata import parse_filename_stem, search_musicbrainz
+from backfill_metadata import parse_filename_stem, search_musicbrainz, backfill_online
 
 
 def test_hyphen_separator():
@@ -99,12 +100,6 @@ def test_search_year_from_date_prefix():
     with patch.dict(sys.modules, {"musicbrainzngs": mb}):
         result = search_musicbrainz("Song", "Artist")
     assert result["year"] == 1999
-
-
-import sqlite3
-from unittest.mock import patch, MagicMock
-
-from backfill_metadata import backfill_online
 
 
 def _make_test_db(title="Title", artist="Artist", genre=None, year=None, album=None):

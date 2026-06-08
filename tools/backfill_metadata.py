@@ -74,7 +74,10 @@ def search_musicbrainz(title: str, artist: str) -> dict:
 
 
 def backfill_online(conn: sqlite3.Connection, dry_run: bool) -> tuple[int, int, int]:
-    """Pass 2: query MusicBrainz for rows still missing fields. Returns (updated, skipped, failed)."""
+    """Pass 2: query MusicBrainz for rows still missing fields.
+
+    Returns (updated, skipped, failed). failed is always 0 — search errors are counted as skipped.
+    """
     try:
         import musicbrainzngs  # noqa: F401
     except ImportError:
