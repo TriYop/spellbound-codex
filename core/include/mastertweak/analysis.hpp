@@ -2,6 +2,7 @@
 
 #include <array>
 #include <string_view>
+#include <vector>
 
 namespace mt {
 
@@ -40,5 +41,16 @@ struct AnalysisSnapshot {
 // Analyse a whole audio file offline.
 // If the file is mono it is treated as dual-mono (correlation = 1 everywhere).
 AnalysisSnapshot analyseFile(const AudioFile& audio);
+
+struct ResonancePeak {
+    float freqHz  = 0.f;
+    float q       = 1.f;
+    float gainDb  = 0.f;   // negative = attenuation
+    bool  enabled = true;
+};
+
+// Detects narrow resonances in the full audio signal.
+// Returns at most kMaxResonances peaks sorted by prominence (highest first).
+std::vector<ResonancePeak> detectResonances(const AudioFile& audio);
 
 } // namespace mt
