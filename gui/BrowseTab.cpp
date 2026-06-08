@@ -1,6 +1,7 @@
 #include "BrowseTab.h"
 #include "PresetBuilderCtx.h"
 
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -50,9 +51,14 @@ BrowseTab::BrowseTab(PresetBuilderCtx& ctx, QWidget* parent)
     {
         auto* row = new QHBoxLayout;
         auto* delBtn = new QPushButton("Delete selected", this);
+        playBtn_     = new QPushButton("\xe2\x96\xb6  Play", this);  // ▶  Play
         countLbl_    = new QLabel("0 tracks", this);
-        connect(delBtn, &QPushButton::clicked, this, &BrowseTab::onDeleteSelected);
+        playBtn_->setEnabled(false);
+        connect(delBtn,   &QPushButton::clicked, this, &BrowseTab::onDeleteSelected);
+        connect(playBtn_, &QPushButton::clicked, this, &BrowseTab::onPlaySelected);
         row->addWidget(delBtn);
+        row->addStretch();
+        row->addWidget(playBtn_);
         row->addStretch();
         row->addWidget(countLbl_);
         vbox->addLayout(row);
@@ -68,7 +74,10 @@ BrowseTab::BrowseTab(PresetBuilderCtx& ctx, QWidget* parent)
     connect(artistEdit_, &QLineEdit::textChanged, this, &BrowseTab::onFilterChanged);
     connect(genreEdit_,  &QLineEdit::textChanged, this, &BrowseTab::onFilterChanged);
 
-    connect(table_, &QTableWidget::itemChanged, this, &BrowseTab::onItemChanged);
+    connect(table_, &QTableWidget::itemChanged,
+            this, &BrowseTab::onItemChanged);
+    connect(table_, &QTableWidget::itemSelectionChanged,
+            this, &BrowseTab::onSelectionChanged);
 }
 
 void BrowseTab::onFilterChanged() { debounce_->start(); }
@@ -176,6 +185,24 @@ void BrowseTab::onDeleteSelected() {
 
     refresh();
     emit libraryChanged();
+}
+
+QString BrowseTab::selectedPath() const {
+    const auto rows = table_->selectionModel()->selectedRows();
+    if (rows.isEmpty()) return {};
+    auto* item = table_->item(rows.first().row(), kColPath);
+    return item ? item->text() : QString{};
+}
+
+void BrowseTab::onSelectionChanged() {
+    const QString path = selectedPath();
+    playBtn_->setEnabled(!path.isEmpty() && QFileInfo::exists(path));
+}
+
+void BrowseTab::onPlaySelected() {
+    const QString path = selectedPath();
+    if (!path.isEmpty() && QFileInfo::exists(path))
+        emit playRequested(path);
 }
 
 } // namespace gui

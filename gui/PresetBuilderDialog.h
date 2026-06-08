@@ -15,6 +15,7 @@ class IngestTab;
 class BrowseTab;
 class CreatePresetTab;
 class ManagePresetsTab;
+class TransportWidget;
 
 class PresetBuilderDialog : public QDialog {
     Q_OBJECT
@@ -41,11 +42,12 @@ private:
     std::string              execDir_;
     std::unique_ptr<PresetBuilderCtx> ctx_;
 
-    QTabWidget*      tabs_       = nullptr;
-    IngestTab*       ingestTab_  = nullptr;
-    BrowseTab*       browseTab_  = nullptr;
-    CreatePresetTab* createTab_  = nullptr;
+    QTabWidget*       tabs_       = nullptr;
+    IngestTab*        ingestTab_  = nullptr;
+    BrowseTab*        browseTab_  = nullptr;
+    CreatePresetTab*  createTab_  = nullptr;
     ManagePresetsTab* manageTab_  = nullptr;
+    TransportWidget*  transport_  = nullptr;
 };
 
 } // namespace gui

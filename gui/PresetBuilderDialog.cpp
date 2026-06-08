@@ -4,6 +4,7 @@
 #include "IngestTab.h"
 #include "ManagePresetsTab.h"
 #include "PresetBuilderCtx.h"
+#include "TransportWidget.h"
 
 #include <QCloseEvent>
 #include <QDir>
@@ -50,6 +51,9 @@ void PresetBuilderDialog::buildUi() {
 
     vbox->addWidget(tabs_);
 
+    transport_ = new TransportWidget(this);
+    vbox->addWidget(transport_);
+
     // Cross-tab wiring
     connect(ingestTab_,  &IngestTab::libraryChanged,
             browseTab_,  &BrowseTab::refresh);
@@ -63,6 +67,10 @@ void PresetBuilderDialog::buildUi() {
             manageTab_,  &ManagePresetsTab::refresh);
     connect(ingestTab_,  &IngestTab::ingesting,
             this,        &PresetBuilderDialog::onIngesting);
+    connect(browseTab_, &BrowseTab::playRequested,
+            transport_,  &TransportWidget::loadFile);
+    connect(browseTab_, &BrowseTab::playRequested,
+            transport_,  &TransportWidget::play);
 
     // Initial population
     browseTab_->refresh();

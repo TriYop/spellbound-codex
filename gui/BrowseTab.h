@@ -9,6 +9,7 @@
 QT_BEGIN_NAMESPACE
 class QLabel;
 class QLineEdit;
+class QPushButton;
 class QTableWidget;
 class QTableWidgetItem;
 class QTimer;
@@ -29,16 +30,20 @@ public slots:
     void refresh();  // re-run current filter and repopulate table
 
 signals:
-    void libraryChanged();  // emitted after delete
+    void libraryChanged();             // emitted after delete
+    void playRequested(const QString& path);  // emitted when Play is clicked
 
 private slots:
     void onFilterChanged();
     void onItemChanged(QTableWidgetItem* item);
     void onDeleteSelected();
+    void onSelectionChanged();
+    void onPlaySelected();
 
 private:
     void populateTable(const std::vector<pb::Track>& tracks);
     pb::TrackFilter currentFilter() const;
+    QString selectedPath() const;  // path of the currently selected row, or ""
 
     PresetBuilderCtx& ctx_;
 
@@ -48,6 +53,7 @@ private:
     QTableWidget* table_       = nullptr;
     QLabel*       countLbl_    = nullptr;
     QTimer*       debounce_    = nullptr;
+    QPushButton*  playBtn_     = nullptr;
 
     bool          blocking_    = false;  // suppresses itemChanged during populate
 

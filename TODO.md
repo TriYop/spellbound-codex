@@ -22,6 +22,7 @@
 
 - Auto-discover similar tracks
   - a button named "auto-discover" (in the "Manage presets" window, on the "Create preset" panel) starts the similarity analysis.
+  - **Clustering algorithm investigation:** evaluate a KNN (K-Nearest Neighbours) approach as the grouping engine. Each track's feature vector = `[bandRmsDb[7], bandTransientDb[7], bandMinCorr[7], overallRmsDb]` (21 dimensions). KNN builds a mutual-proximity graph; connected components where every node's K nearest neighbours are within a distance threshold form preset candidates. Compare against the simpler "sum-of-distances + manual threshold" baseline on the existing library before committing to one approach. Key open questions: choice of K, distance metric (Euclidean vs. cosine vs. weighted), and whether to normalise dimensions before comparison.
   - similarity should be considered as the sum of all analysis parameters distances. Threshold to define a group must be defined by the user and should default to some relevant value according to the kind of data handled.
   - In an auto-discover session, each track should not be used in more than one preset but can belong to none.
   - tracks with very low distance should be grouped as a preset candidate. The user can refine the selection by removing tracks from selection, but not adding other tracks.
@@ -30,9 +31,7 @@
   - Once the preset info are set, it can be saved and the next preset is tried to be discovered. 
   - A cancel button on the window allows to close the auto-discover window and dismisses all unsaved groups.
 
-- From presets manager > Browse/Tag, allow to play a track if it exists on mounted filesystem.
-  - User selects a track in the list then pushes a play button on the same row as the "delete selected" one. The play button is at mid-width of the window.
-  - If the selected track's file exists on mounted filesystem, then the play button is active ; otherwise, it is inactive
+- ~~From presets manager > Browse/Tag, allow to play a track if it exists on mounted filesystem.~~ **DONE** — Play ▶ button added to the Browse/Tag toolbar (centred between Delete and track count). Enabled only when a selected track's file exists on disk (`QFileInfo::exists`). Clicking loads and plays via the `TransportWidget` embedded at the bottom of the Preset Builder dialog.
 
 - From presets manager > Browse/Tag, a button allows to fetch track data from any available source such as ID3 tags (if relevant) or from online sources 
 
