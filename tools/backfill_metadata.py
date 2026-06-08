@@ -36,6 +36,9 @@ def extract_tags(path: str) -> dict:
 
 def backfill(db_path: str, dry_run: bool) -> None:
     conn = sqlite3.connect(db_path)
+    # Some paths were stored with non-UTF-8 encoding (e.g. latin-1 filenames).
+    # surrogateescape lets us round-trip them to mutagen without crashing.
+    conn.text_factory = lambda b: b.decode("utf-8", errors="surrogateescape")
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
