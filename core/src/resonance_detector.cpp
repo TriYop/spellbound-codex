@@ -96,24 +96,24 @@ std::vector<ResonancePeak> detectResonances(const AudioFile& audio)
         // Step 6a–6e: find 3 dB bandwidth
         const float threshold3dB = mk - 3.f;
 
-        // Scan left for 3 dB point
-        int left3dB = k;
+        // Scan left for 3 dB point (last bin still at or above threshold)
+        int left3dB = 0;  // fallback: edge of spectrum
         for (int j = k - 1; j >= 0; --j) {
             if (magDb[static_cast<std::size_t>(j)] <= threshold3dB) {
-                left3dB = j;
+                left3dB = j + 1;  // last bin still above threshold
                 break;
             }
-            left3dB = j; // keep scanning; if we reach 0 use it
+            if (j == 0) left3dB = 0;  // never crossed: use bin 0
         }
 
-        // Scan right for 3 dB point
-        int right3dB = k;
+        // Scan right for 3 dB point (last bin still at or above threshold)
+        int right3dB = halfN - 1;  // fallback: edge of spectrum
         for (int j = k + 1; j < halfN; ++j) {
             if (magDb[static_cast<std::size_t>(j)] <= threshold3dB) {
-                right3dB = j;
+                right3dB = j - 1;  // last bin still above threshold
                 break;
             }
-            right3dB = j; // keep scanning; if we reach end use it
+            if (j == halfN - 1) right3dB = halfN - 1;  // never crossed: use last bin
         }
 
         // Bandwidth in Hz (clamp to at least one bin width to avoid div/0)
