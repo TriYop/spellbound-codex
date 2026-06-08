@@ -21,6 +21,7 @@ add_library(mastertweak_core STATIC
     src/dsp/dither.cpp
     src/dsp/lufs_analyser.cpp
     src/dsp/gain_stager.cpp
+    src/dsp/resonance_eq.cpp
 )
 
 target_include_directories(mastertweak_core PUBLIC
