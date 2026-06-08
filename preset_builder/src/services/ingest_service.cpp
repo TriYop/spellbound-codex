@@ -4,6 +4,8 @@
 #include "mastertweak/codec_correction.hpp"
 #include "mastertweak/io.hpp"
 
+#include "preset_builder/adapters/embedded_tag_metadata_provider.hpp"
+
 #include "picosha2.h"
 
 #include <atomic>
@@ -132,6 +134,8 @@ IngestReport IngestService::ingest(const std::string& path,
     }
     const float total = static_cast<float>(files.size());
 
+    EmbeddedTagMetadataProvider embeddedTagProvider;
+
     const unsigned      nThreads = std::max(1u, std::thread::hardware_concurrency());
     std::atomic<size_t> nextIndex{0};
     std::atomic<size_t> doneCount{0};
@@ -209,17 +213,49 @@ IngestReport IngestService::ingest(const std::string& path,
                 analysis.bandRmsDb[j] += corr[j];
         }
 
-        // 4. Metadata — serialised
-        std::optional<TrackMetadata> meta;
-        { std::lock_guard lk(mutex); meta = metaProvider.lookup(filePath); }
-        if (!meta) meta = parseFilenameMetadata(filePath);
+        // 4. Metadata — serialised (AcoustID + embedded tags, per-field merge)
+        std::optional<TrackMetadata> acoustidMeta;
+        std::optional<TrackMetadata> tagMeta;
+        {
+            std::lock_guard lk(mutex);
+            acoustidMeta = metaProvider.lookup(filePath);
+            tagMeta      = embeddedTagProvider.lookup(filePath);
+        }
+
+        TrackMetadata meta;
+        // title / artist / album: AcoustID wins, embedded tags fill gaps
+        if (acoustidMeta && acoustidMeta->title)  meta.title  = acoustidMeta->title;
+        else if (tagMeta  && tagMeta->title)       meta.title  = tagMeta->title;
+
+        if (acoustidMeta && acoustidMeta->artist) meta.artist = acoustidMeta->artist;
+        else if (tagMeta  && tagMeta->artist)      meta.artist = tagMeta->artist;
+
+        if (acoustidMeta && acoustidMeta->album)  meta.album  = acoustidMeta->album;
+        else if (tagMeta  && tagMeta->album)       meta.album  = tagMeta->album;
+
+        // genre / year: only from embedded tags (AcoustID never provides them)
+        if (tagMeta && tagMeta->genre) meta.genre = tagMeta->genre;
+        if (tagMeta && tagMeta->year)  meta.year  = tagMeta->year;
+
+        // source: tracks where the primary identification (title/artist) came from
+        if (acoustidMeta && (meta.title || meta.artist)) {
+            meta.source = MetadataSource::acoustid;
+        } else if (tagMeta && (meta.title || meta.artist)) {
+            meta.source = MetadataSource::embedded_tags;
+        } else {
+            // fall back to filename for title/artist
+            auto fn = parseFilenameMetadata(filePath);
+            meta.title  = fn.title;
+            meta.artist = fn.artist;
+            meta.source = MetadataSource::filename;
+        }
 
         // 5. Persist — serialised
         Track track;
         track.id       = TrackId{hash};
         track.path     = filePath;
         track.fileSize = szEc ? 0 : fileSize;
-        track.metadata = *meta;
+        track.metadata = meta;
         track.analysis = analysis;
         track.addedAt  = utcNow();
         { std::lock_guard lk(mutex); repo.save(track); ++report.added; }
