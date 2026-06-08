@@ -1,5 +1,6 @@
 #include "mastertweak/pipeline.hpp"
 
+#include "mastertweak/dsp/resonance_eq.hpp"
 #include "mastertweak/dsp/parametric_eq.hpp"
 #include "mastertweak/dsp/multiband_comp.hpp"
 #include "mastertweak/dsp/mixbus_comp.hpp"
@@ -103,6 +104,15 @@ MasterResult renderFile(const std::string&     inputPath,
     // Snapshot reference RMS (post-pre-gain, pre-DSP) for post-multiband restore.
     dsp::GainStager gs;
     const float rmsDbBeforeChain = dsp::GainStager::measureRmsDb(buf, nf);
+
+    // ── Resonance EQ ──────────────────────────────────────────────────────────────
+    if (!opts.bypassResonanceEq && !adv.resonances.empty()) {
+        report(0.23f, "Resonance EQ");
+        dsp::ResonanceEq resEq;
+        resEq.prepare(sr, nch);
+        resEq.setResonances(adv.resonances);
+        resEq.process(buf, nf);
+    }
 
     // ── EQ ───────────────────────────────────────────────────────────────────
     if (!opts.bypassEq) {

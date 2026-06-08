@@ -16,6 +16,7 @@ namespace mt {
 struct RenderOptions {
     int  outputBitDepth   = 24;
     bool outputFlac       = false;
+    bool bypassResonanceEq = false;
     bool bypassEq         = false;
     bool bypassMbComp     = false;
     bool bypassSaturator  = false;
