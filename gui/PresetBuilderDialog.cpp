@@ -20,8 +20,8 @@ PresetBuilderDialog::PresetBuilderDialog(const std::string& executableDir,
     setWindowTitle("Preset Builder");
     resize(900, 640);
 
-    // Ensure the MixAdvice config directory exists.
-    const QString configDir = QDir::homePath() + "/.config/MixAdvice";
+    // Ensure the MasterTweak config directory exists.
+    const QString configDir = QDir::homePath() + "/.config/MasterTweak";
     QDir().mkpath(configDir);
     const std::string dbPath = (configDir + "/preset_builder.db").toStdString();
 
