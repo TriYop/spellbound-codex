@@ -54,6 +54,7 @@ MasterResult analyseOnly(const std::string& inputPath,
     result.preGainDb = applyPreGain(*audio, preset.overallRmsDb);
     result.analysis  = analyseFile(*audio);
     result.advice   = deriveAdvice(result.analysis, preset);
+    result.advice.resonances = detectResonances(*audio);
     result.ok       = true;
     return result;
 }
@@ -90,6 +91,8 @@ MasterResult renderFile(const std::string&     inputPath,
     // ── Derive advice ─────────────────────────────────────────────────────────
     report(0.20f, "Deriving advice");
     result.advice = adviceOverride ? *adviceOverride : deriveAdvice(result.analysis, preset);
+    if (!adviceOverride)
+        result.advice.resonances = detectResonances(*audio);
 
     const AdviceSet& adv = result.advice;
     const float sr = static_cast<float>(audio->sampleRate);

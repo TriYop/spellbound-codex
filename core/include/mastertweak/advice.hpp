@@ -4,6 +4,7 @@
 #include "mastertweak/preset.hpp"
 
 #include <array>
+#include <vector>
 
 namespace mt {
 
@@ -59,6 +60,7 @@ struct AdviceSet {
     MixbusComp  mixbusComp  {};
     SaturatorParams saturator {};
     LimiterParams   limiter   {};
+    std::vector<ResonancePeak> resonances;
 };
 
 // Derive an AdviceSet from analysis + preset.
