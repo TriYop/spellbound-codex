@@ -47,7 +47,7 @@ std::array<float, 7> computeCodecCorrection(const AudioFile& audio) {
     }
 
     const auto avgMag = dsp::averagedMagnitudeSpectrum(
-        mono.data(), audio.numFrames, static_cast<int>(kFftN), sr);
+        mono.data(), audio.numFrames, static_cast<int>(kFftN));
 
     if (avgMag.empty()) return corr;
 

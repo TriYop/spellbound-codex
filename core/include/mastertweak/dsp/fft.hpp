@@ -11,7 +11,6 @@ void inplaceFft(std::vector<float>& re, std::vector<float>& im);
 /// using Hann window and 50% overlap across all frames.
 std::vector<float> averagedMagnitudeSpectrum(const float* samples,
                                               int          numFrames,
-                                              int          fftN,
-                                              float        sampleRate);
+                                              int          fftN);
 
 } // namespace mt::dsp

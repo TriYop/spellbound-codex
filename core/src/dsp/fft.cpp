@@ -1,6 +1,7 @@
 #include "mastertweak/dsp/fft.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <numbers>
 #include <vector>
@@ -9,6 +10,7 @@ namespace mt::dsp {
 
 // In-place iterative Cooley-Tukey DIT FFT (N must be a power of 2).
 void inplaceFft(std::vector<float>& re, std::vector<float>& im) {
+    assert((re.size() & (re.size() - 1)) == 0 && !re.empty()); // must be power of 2
     const size_t N = re.size();
     // Bit-reversal permutation
     for (size_t i = 1, j = 0; i < N; ++i) {
@@ -45,8 +47,7 @@ void inplaceFft(std::vector<float>& re, std::vector<float>& im) {
 // using Hann window and 50% overlap across all frames.
 std::vector<float> averagedMagnitudeSpectrum(const float* samples,
                                               int          numFrames,
-                                              int          fftN,
-                                              float        /*sampleRate*/) {
+                                              int          fftN) {
     const size_t N   = static_cast<size_t>(fftN);
     const size_t hop = N / 2;  // 50% overlap
 
@@ -61,7 +62,7 @@ std::vector<float> averagedMagnitudeSpectrum(const float* samples,
         for (size_t i = 0; i < N; ++i) {
             const float w = 0.5f * (1.f - std::cos(2.f * std::numbers::pi_v<float>
                                                     * static_cast<float>(i)
-                                                    / static_cast<float>(N - 1)));
+                                                    / static_cast<float>(N)));
             re[i] = samples[start + i] * w;
         }
         inplaceFft(re, im);
