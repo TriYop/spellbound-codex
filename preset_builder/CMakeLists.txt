@@ -10,6 +10,7 @@ add_library(preset_builder_core STATIC
     src/adapters/database.cpp
     src/adapters/sqlite_track_repository.cpp
     src/adapters/sqlite_preset_repository.cpp
+    src/adapters/embedded_tag_metadata_provider.cpp
 )
 
 target_include_directories(preset_builder_core
