@@ -85,6 +85,8 @@ def backfill_online(conn: sqlite3.Connection, dry_run: bool) -> tuple[int, int, 
         return 0, 0, 0
 
     cur = conn.cursor()
+    # Trigger on genre or year missing — the fields that drive preset similarity.
+    # Album-only gaps are not worth the extra API call.
     rows = cur.execute(
         "SELECT t.id, t.path, tm.title, tm.artist, tm.album, tm.genre, tm.year "
         "FROM tracks t JOIN track_metadata tm ON t.id = tm.track_id "
@@ -134,7 +136,8 @@ def backfill_online(conn: sqlite3.Connection, dry_run: bool) -> tuple[int, int, 
             cur.execute(f"UPDATE track_metadata SET {set_clause} WHERE track_id = ?", vals)
         updated += 1
 
-        time.sleep(1)
+        if not dry_run:
+            time.sleep(1)
 
     if not dry_run:
         conn.commit()
@@ -168,6 +171,7 @@ def extract_tags(path: str) -> dict:
 def _backfill_embedded(conn: sqlite3.Connection, dry_run: bool) -> tuple[int, int, int]:
     """Pass 1: fill missing fields from embedded audio tags. Returns (updated, skipped, failed)."""
     cur = conn.cursor()
+    # Trigger on genre or year missing — the fields that drive preset similarity.
     rows = cur.execute(
         "SELECT t.id, t.path, tm.title, tm.artist, tm.album, tm.genre, tm.year "
         "FROM tracks t JOIN track_metadata tm ON t.id = tm.track_id "

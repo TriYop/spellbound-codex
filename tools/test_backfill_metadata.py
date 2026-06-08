@@ -163,11 +163,12 @@ def test_online_dry_run_does_not_write():
     conn = _make_test_db()
     with _mb_available(), \
          patch("backfill_metadata.search_musicbrainz", return_value={"genre": "jazz"}), \
-         patch("time.sleep"):
+         patch("time.sleep") as mock_sleep:
         backfill_online(conn, dry_run=True)
 
     row = conn.execute("SELECT genre FROM track_metadata WHERE track_id='id1'").fetchone()
     assert row["genre"] is None
+    mock_sleep.assert_not_called()
     conn.close()
 
 
