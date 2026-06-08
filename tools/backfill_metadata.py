@@ -217,6 +217,8 @@ def _backfill_embedded(conn: sqlite3.Connection, dry_run: bool) -> tuple[int, in
 
 def backfill(db_path: str, dry_run: bool, online: bool = True) -> None:
     conn = sqlite3.connect(db_path)
+    # Some paths were stored with non-UTF-8 encoding (e.g. latin-1 filenames).
+    # surrogateescape lets us round-trip them to mutagen without crashing.
     conn.text_factory = lambda b: b.decode("utf-8", errors="surrogateescape")
     conn.row_factory = sqlite3.Row
 
@@ -233,6 +235,8 @@ def backfill(db_path: str, dry_run: bool, online: bool = True) -> None:
     print(f"  Pass 1 (embedded tags): updated {p1_updated}, skipped {p1_skipped}, failed {p1_failed}")
     if online:
         print(f"  Pass 2 (MusicBrainz):   updated {p2_updated}, skipped {p2_skipped}, failed {p2_failed}")
+    else:
+        print("  Pass 2 (MusicBrainz):   skipped (--no-online)")
 
 
 def main():
