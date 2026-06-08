@@ -194,7 +194,7 @@ IngestReport IngestService::ingest(const std::string& path,
         }
         if (inDb) { reportProgress("Skipped: " + filename); return; }
 
-        // 3. Decode + analyse — lock-free, per-file AudioFile owns its data
+        // 5. Decode + analyse — lock-free, per-file AudioFile owns its data
         std::string err;
         const auto audio = mt::readAudioFile(filePath, &err);
         if (!audio) {
@@ -213,25 +213,22 @@ IngestReport IngestService::ingest(const std::string& path,
                 analysis.bandRmsDb[j] += corr[j];
         }
 
-        // 4. Metadata — serialised (AcoustID + embedded tags, per-field merge)
+        // 6. Metadata — serialised (AcoustID + embedded tags, per-field merge)
         std::optional<TrackMetadata> acoustidMeta;
         std::optional<TrackMetadata> tagMeta;
-        {
-            std::lock_guard lk(mutex);
-            acoustidMeta = metaProvider.lookup(filePath);
-            tagMeta      = embeddedTagProvider.lookup(filePath);
-        }
+        tagMeta = embeddedTagProvider.lookup(filePath);
+        { std::lock_guard lk(mutex); acoustidMeta = metaProvider.lookup(filePath); }
 
         TrackMetadata meta;
         // title / artist / album: AcoustID wins, embedded tags fill gaps
-        if (acoustidMeta && acoustidMeta->title)  meta.title  = acoustidMeta->title;
-        else if (tagMeta  && tagMeta->title)       meta.title  = tagMeta->title;
+        if (acoustidMeta && acoustidMeta->title)  meta.title = acoustidMeta->title;
+        else if (tagMeta && tagMeta->title)       meta.title = tagMeta->title;
 
         if (acoustidMeta && acoustidMeta->artist) meta.artist = acoustidMeta->artist;
-        else if (tagMeta  && tagMeta->artist)      meta.artist = tagMeta->artist;
+        else if (tagMeta && tagMeta->artist)      meta.artist = tagMeta->artist;
 
-        if (acoustidMeta && acoustidMeta->album)  meta.album  = acoustidMeta->album;
-        else if (tagMeta  && tagMeta->album)       meta.album  = tagMeta->album;
+        if (acoustidMeta && acoustidMeta->album)  meta.album = acoustidMeta->album;
+        else if (tagMeta && tagMeta->album)       meta.album = tagMeta->album;
 
         // genre / year: only from embedded tags (AcoustID never provides them)
         if (tagMeta && tagMeta->genre) meta.genre = tagMeta->genre;
@@ -250,7 +247,7 @@ IngestReport IngestService::ingest(const std::string& path,
             meta.source = MetadataSource::filename;
         }
 
-        // 5. Persist — serialised
+        // 7. Persist — serialised
         Track track;
         track.id       = TrackId{hash};
         track.path     = filePath;
