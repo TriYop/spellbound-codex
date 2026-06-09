@@ -12,8 +12,8 @@ struct BandStats {
     float avgRmsDb    = -100.f;  // long-term RMS over the whole file (dBFS)
     float peakRmsDb   = -100.f;  // peak-hold of the 100ms-smoothed RMS (dBFS)
     float p10RmsDb    = -100.f;  // 10th-percentile of per-block RMS (dBFS)
-    float p50RmsDb    = -100.f;  // median of per-block RMS (dBFS)
-    float p95RmsDb    = -100.f;  // 95th-percentile of per-block RMS (dBFS)
+    float p50RmsDb    = -100.f;  // upper-median of per-block RMS (dBFS); floor(0.5·N) index
+    float p95RmsDb    = -100.f;  // 95th-percentile of per-block RMS (dBFS); raw blocks, cf. peakRmsDb which uses 100ms-smoothed RMS
     float correlation =    1.f;  // integrated Pearson L/R correlation [-1, 1]
     float crestDb     =    0.f;  // average crest factor (peak/RMS) in dB
 };
