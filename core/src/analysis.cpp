@@ -116,6 +116,12 @@ AnalysisSnapshot analyseFile(const AudioFile& audio) {
     std::vector<float> band0(static_cast<size_t>(kBlockSize));
     std::vector<float> band1(static_cast<size_t>(kBlockSize));
 
+    auto toDb = [](float lin) -> float {
+        return lin > 1e-7f ? 20.f * std::log10(lin) : -100.f;
+    };
+
+    std::array<std::vector<float>, kNumBands> bandRmsSamples;
+
     const int numFrames = audio.numFrames;
     const float* chL = audio.samples[0].data();
     const float* chR = isMono ? chL : audio.samples[1].data();
@@ -173,6 +179,7 @@ AnalysisSnapshot analyseFile(const AudioFile& audio) {
 
             intBandSumL2[bandIdx] += static_cast<double>(rmsL) * rmsL;
             intBandSumR2[bandIdx] += static_cast<double>(rmsR) * rmsR;
+            bandRmsSamples[bandIdx].push_back((toDb(rmsL) + toDb(rmsR)) * 0.5f);
         };
 
         // Cascaded LR4 filterbank
@@ -191,8 +198,7 @@ AnalysisSnapshot analyseFile(const AudioFile& audio) {
     }
 
     // Convert accumulators → final snapshot values
-    auto toDb      = [](float lin) { return lin > 1e-7f ? 20.f * std::log10(lin) : -100.f; };
-    auto toCrestDb = [](float r)   { return r > 1.f    ? 20.f * std::log10(r)    :   0.f; };
+    auto toCrestDb = [](float r) -> float { return r > 1.f ? 20.f * std::log10(r) : 0.f; };
 
     for (size_t i = 0; i < static_cast<size_t>(kNumBands); ++i) {
         const double n = static_cast<double>(blockCount);
@@ -206,6 +212,22 @@ AnalysisSnapshot analyseFile(const AudioFile& audio) {
         snap.bands[i].peakRmsDb   = peakRms;
         snap.bands[i].correlation = smoothCorrBand[i];
         snap.bands[i].crestDb     = avgCrest;
+
+        // Percentile descriptors — sort collected block-RMS samples and read indices
+        {
+            auto& v = bandRmsSamples[i];
+            std::sort(v.begin(), v.end());
+            auto pct = [&](float p) -> float {
+                if (v.empty()) return -100.f;
+                const auto idx = static_cast<size_t>(
+                    std::clamp(static_cast<int>(std::floor(p * static_cast<float>(v.size()))),
+                               0, static_cast<int>(v.size()) - 1));
+                return v[idx];
+            };
+            snap.bands[i].p10RmsDb = pct(0.10f);
+            snap.bands[i].p50RmsDb = pct(0.50f);
+            snap.bands[i].p95RmsDb = pct(0.95f);
+        }
     }
 
     {
