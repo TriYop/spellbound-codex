@@ -11,6 +11,9 @@ struct AudioFile;  // forward declare — analysis.hpp doesn't need io.hpp inter
 struct BandStats {
     float avgRmsDb    = -100.f;  // long-term RMS over the whole file (dBFS)
     float peakRmsDb   = -100.f;  // peak-hold of the 100ms-smoothed RMS (dBFS)
+    float p10RmsDb    = -100.f;  // 10th-percentile of per-block RMS (dBFS)
+    float p50RmsDb    = -100.f;  // median of per-block RMS (dBFS)
+    float p95RmsDb    = -100.f;  // 95th-percentile of per-block RMS (dBFS)
     float correlation =    1.f;  // integrated Pearson L/R correlation [-1, 1]
     float crestDb     =    0.f;  // average crest factor (peak/RMS) in dB
 };

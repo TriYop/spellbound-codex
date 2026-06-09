@@ -90,3 +90,40 @@ TEST_CASE("mono input is treated as dual-mono (correlation = 1)") {
     CHECK(snap.overallCorr > 0.99f);
     CHECK(snap.overallAvgDb > -30.f);
 }
+
+TEST_CASE("percentile descriptors: P10 in quiet zone, P95 in loud zone, P10 < P50 < P95") {
+    // First half of signal is loud (0.3 amp ≈ -13.5 dBFS sine RMS).
+    // Second half is quiet (0.03 amp ≈ -33.5 dBFS sine RMS).
+    // 1 kHz lands in the Mids band (index 3, crossovers 500 Hz – 2 kHz).
+    const int   sr        = 44100;
+    const float durSec    = 4.f;
+    const int   numFrames = static_cast<int>(static_cast<float>(sr) * durSec);
+    const int   halfFrames = numFrames / 2;
+
+    mt::AudioFile f;
+    f.sampleRate  = sr;
+    f.numChannels = 2;
+    f.numFrames   = numFrames;
+    f.bitDepth    = 24;
+    f.samples.resize(2, std::vector<float>(static_cast<size_t>(numFrames)));
+    for (int i = 0; i < numFrames; ++i) {
+        const float amp = (i < halfFrames) ? 0.3f : 0.03f;
+        const float s = amp * std::sin(2.f * std::numbers::pi_v<float> * 1000.f
+                                        * static_cast<float>(i) / static_cast<float>(sr));
+        f.samples[0][static_cast<size_t>(i)] = s;
+        f.samples[1][static_cast<size_t>(i)] = s;
+    }
+
+    const auto snap = mt::analyseFile(f);
+    const auto& b   = snap.bands[3];  // Mids band
+
+    // Ordering invariants
+    CHECK(b.p10RmsDb <= b.p50RmsDb);
+    CHECK(b.p50RmsDb <= b.p95RmsDb);
+    // Loud section (amp 0.3, ~-13.5 dBFS) dominates P95; allow ±5 dB for filter leakage
+    CHECK(b.p95RmsDb > -20.f);
+    // Quiet section (amp 0.03, ~-33.5 dBFS) is captured by P10
+    CHECK(b.p10RmsDb < -25.f);
+    // At least 10 dB separates the two extremes
+    CHECK(b.p10RmsDb < b.p95RmsDb - 10.f);
+}
