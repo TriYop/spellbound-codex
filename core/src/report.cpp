@@ -57,12 +57,15 @@ std::string formatAdviceMarkdown(
 
     // ── Analysis ──────────────────────────────────────────────────────────────
     md << "## Analysis — Measured Values\n\n";
-    md << "| Band    | RMS (dBFS) | Crest (dB) | L/R Corr |\n";
-    md << "| ------- | ---------- | ---------- | -------- |\n";
+    md << "| Band    | Avg (dBFS) | P10 (dBFS) | P50 (dBFS) | P95 (dBFS) | Crest (dB) | L/R Corr |\n";
+    md << "| ------- | ---------- | ---------- | ---------- | ---------- | ---------- | -------- |\n";
     for (int i = 0; i < AnalysisSnapshot::kNumBands; ++i) {
         const auto& b = snap.bands[i];
         md << "| " << std::left  << std::setw(7) << AnalysisSnapshot::kBandNames[i]
            << " | " << std::right << std::setw(10) << fmtDb(b.avgRmsDb)
+           << " | " << std::setw(10) << fmtDb(b.p10RmsDb)
+           << " | " << std::setw(10) << fmtDb(b.p50RmsDb)
+           << " | " << std::setw(10) << fmtDb(b.p95RmsDb)
            << " | " << std::setw(10) << fmtF(b.crestDb)
            << " | " << std::setw(8)  << fmtF(b.correlation, 2) << " |\n";
     }
