@@ -19,7 +19,7 @@ AdviceSet deriveAdvice(const AnalysisSnapshot& snap, const PresetData& preset) {
     // then averaged L/R — exactly as MixAdvice/PluginEditor.cpp:532-534.
     for (int i = 0; i < AdviceSet::kNumBands; ++i) {
         const auto bi = static_cast<size_t>(i);
-        const float refDb = (snap.bands[bi].avgRmsDb + snap.bands[bi].peakRmsDb) * 0.5f;
+        const float refDb = (snap.bands[bi].p50RmsDb + snap.bands[bi].p95RmsDb) * 0.5f;
 
         // ── EQ ────────────────────────────────────────────────────────────────
         float eqGain = std::clamp(preset.bandRmsDb[bi] - refDb, -12.f, 12.f);

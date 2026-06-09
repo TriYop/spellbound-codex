@@ -7,13 +7,12 @@
 static mt::AnalysisSnapshot makeOnTargetSnapshot(const mt::PresetData& preset) {
     mt::AnalysisSnapshot snap;
     for (size_t i = 0; i < static_cast<size_t>(mt::AnalysisSnapshot::kNumBands); ++i) {
-        // avgRmsDb == peakRmsDb == bandRmsDb[i]  →  refDb == bandRmsDb[i]  →  eqGain == 0
-        snap.bands[i].avgRmsDb  = preset.bandRmsDb[i];
-        snap.bands[i].peakRmsDb = preset.bandRmsDb[i];
-        // Correlation exactly at the floor
+        snap.bands[i].avgRmsDb   = preset.bandRmsDb[i];
+        snap.bands[i].peakRmsDb  = preset.bandRmsDb[i];
+        snap.bands[i].p50RmsDb   = preset.bandRmsDb[i];
+        snap.bands[i].p95RmsDb   = preset.bandRmsDb[i];
         snap.bands[i].correlation = preset.bandMinCorr[i];
-        // Crest exactly at target
-        snap.bands[i].crestDb = preset.bandTransientDb[i];
+        snap.bands[i].crestDb    = preset.bandTransientDb[i];
     }
     snap.overallAvgDb  = preset.overallRmsDb;
     snap.overallPeakDb = preset.overallRmsDb;
@@ -49,6 +48,8 @@ TEST_CASE("+6 dB excess in one band → EQ gain is -6 dB") {
     // Band 3 (Mids) is 6 dB too hot
     snap.bands[3].avgRmsDb  = -14.f;
     snap.bands[3].peakRmsDb = -14.f;
+    snap.bands[3].p50RmsDb  = -14.f;
+    snap.bands[3].p95RmsDb  = -14.f;
 
     const auto advice = mt::deriveAdvice(snap, preset);
     CHECK(advice.eq[3].gainDb == doctest::Approx(-6.f));
@@ -62,6 +63,8 @@ TEST_CASE("deficit < 0.5 dB → EQ gain rounded to 0") {
     auto snap   = makeOnTargetSnapshot(preset);
     snap.bands[2].avgRmsDb  = -20.3f;  // only 0.3 dB off
     snap.bands[2].peakRmsDb = -20.3f;
+    snap.bands[2].p50RmsDb  = -20.3f;
+    snap.bands[2].p95RmsDb  = -20.3f;
 
     const auto advice = mt::deriveAdvice(snap, preset);
     CHECK(advice.eq[2].gainDb == doctest::Approx(0.f));
@@ -80,6 +83,8 @@ TEST_CASE("excess level → multiband comp ratio increases") {
     auto snap   = makeOnTargetSnapshot(preset);
     snap.bands[1].avgRmsDb  = -12.f;  // 8 dB excess in Lows
     snap.bands[1].peakRmsDb = -12.f;
+    snap.bands[1].p50RmsDb  = -12.f;
+    snap.bands[1].p95RmsDb  = -12.f;
 
     const auto advice = mt::deriveAdvice(snap, preset);
     // ratio = clamp(1 + 8*0.25, 1.1, 8) = clamp(3.0, 1.1, 8) = 3.0
@@ -98,10 +103,14 @@ TEST_CASE("Sub and Air EQ bands are marked as shelves") {
     const auto snap   = makeOnTargetSnapshot(preset);
     // Force non-zero gain so shelf flag matters
     auto snap2 = snap;
-    snap2.bands[0].avgRmsDb = -14.f;  // Sub is too hot
+    snap2.bands[0].avgRmsDb  = -14.f;  // Sub is too hot
     snap2.bands[0].peakRmsDb = -14.f;
-    snap2.bands[6].avgRmsDb = -14.f;  // Air is too hot
+    snap2.bands[0].p50RmsDb  = -14.f;
+    snap2.bands[0].p95RmsDb  = -14.f;
+    snap2.bands[6].avgRmsDb  = -14.f;  // Air is too hot
     snap2.bands[6].peakRmsDb = -14.f;
+    snap2.bands[6].p50RmsDb  = -14.f;
+    snap2.bands[6].p95RmsDb  = -14.f;
 
     const auto advice = mt::deriveAdvice(snap2, preset);
     CHECK(advice.eq[0].isShelf == true);   // Sub
