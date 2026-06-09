@@ -121,6 +121,8 @@ AnalysisSnapshot analyseFile(const AudioFile& audio) {
     };
 
     std::array<std::vector<float>, kNumBands> bandRmsSamples;
+    const size_t estBlocks = static_cast<size_t>((audio.numFrames + kBlockSize - 1) / kBlockSize);
+    for (auto& v : bandRmsSamples) v.reserve(estBlocks);
 
     const int numFrames = audio.numFrames;
     const float* chL = audio.samples[0].data();
