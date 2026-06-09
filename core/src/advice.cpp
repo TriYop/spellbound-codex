@@ -15,8 +15,10 @@ AdviceSet deriveAdvice(const AnalysisSnapshot& snap, const PresetData& preset) {
     AdviceSet out;
 
     // ── Per-band EQ + multiband compression ──────────────────────────────────
-    // "Characteristic level" = mean of long-term average and peak-hold,
-    // then averaged L/R — exactly as MixAdvice/PluginEditor.cpp:532-534.
+    // "Characteristic level" = blend of median (P50) and 95th-percentile (P95) of
+    // per-block RMS — more robust than avg/peak on dynamic tracks.
+    // Intentionally diverges from MixAdvice/PluginEditor.cpp:532-534 (which uses
+    // avgRms + peakHold) to use the distribution-aware percentile blend instead.
     for (int i = 0; i < AdviceSet::kNumBands; ++i) {
         const auto bi = static_cast<size_t>(i);
         const float refDb = (snap.bands[bi].p50RmsDb + snap.bands[bi].p95RmsDb) * 0.5f;
