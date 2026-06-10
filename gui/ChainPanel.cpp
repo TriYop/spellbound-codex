@@ -1,5 +1,6 @@
 #include "ChainPanel.h"
 #include "AudioControl.h"
+#include "RackUnit.h"
 #include "RotaryKnob.h"
 #include "VerticalFader.h"
 
@@ -8,8 +9,7 @@
 #include <cmath>
 
 #include <QCheckBox>
-#include <QGridLayout>
-#include <QGroupBox>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QVBoxLayout>
@@ -23,33 +23,24 @@ ChainPanel::ChainPanel(QWidget* parent)
 }
 
 void ChainPanel::buildUi() {
+    setStyleSheet("ChainPanel { background: #111; }");
     auto* outer = new QVBoxLayout(this);
-    outer->setContentsMargins(0, 0, 0, 0);
+    outer->setContentsMargins(4, 4, 4, 4);
+    outer->setSpacing(2);
 
-    auto* grid = new QGridLayout;
-    for (int c = 0; c < 6; ++c)
-        grid->setColumnStretch(c, 1);
-
-    // ── Tier 0: Resonance EQ ─────────────────────────────────────────────────
+    // ── Resonance EQ ──────────────────────────────────────────────────────────
     {
-        resBox_ = new QGroupBox("Resonance EQ", this);
-        resBox_->setCheckable(true);
-        resBox_->setChecked(false);
-
-        auto* content = new QWidget(resBox_);
-        auto* vbox    = new QVBoxLayout(resBox_);
-        vbox->addWidget(content);
-
-        auto* innerVbox = new QVBoxLayout(content);
-        innerVbox->setContentsMargins(0, 0, 0, 0);
+        auto* body    = new QWidget;
+        auto* innerVbox = new QVBoxLayout(body);
+        innerVbox->setContentsMargins(6, 4, 6, 4);
         innerVbox->setSpacing(2);
 
-        resNoResLabel_ = new QLabel("No resonances detected", content);
+        resNoResLabel_ = new QLabel("No resonances detected", body);
         resNoResLabel_->setStyleSheet("color: #888; font-style: italic;");
         innerVbox->addWidget(resNoResLabel_);
 
         for (int i = 0; i < kMaxResonances; ++i) {
-            auto* row  = new QWidget(content);
+            auto* row  = new QWidget(body);
             auto* hbox = new QHBoxLayout(row);
             hbox->setContentsMargins(0, 0, 0, 0);
             hbox->setSpacing(6);
@@ -67,37 +58,38 @@ void ChainPanel::buildUi() {
             resRowChecks_[i]->setVisible(false);
             innerVbox->addWidget(row);
 
-            connect(resRowChecks_[i], &QCheckBox::toggled,
-                    this, [this](bool) { emitOverride(); });
+            connect(resRowChecks_[i], &QCheckBox::toggled, this, [this](bool) { emitOverride(); });
         }
 
-        connect(resBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(resBox_, 0, 0, 1, 6);
+        resUnit_ = new RackUnit("resEq", "Resonance EQ", body, this);
+        connect(resUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        outer->addWidget(resUnit_);
     }
 
-    // ── Tier 1: EQ ────────────────────────────────────────────────────────────
+    // ── Parametric EQ ─────────────────────────────────────────────────────────
     {
-        eqBox_ = new QGroupBox("EQ", this);
-        eqBox_->setCheckable(true);
-        eqBox_->setChecked(true);
+        auto* body = new QWidget;
+        auto* hbox = new QHBoxLayout(body);
+        hbox->setContentsMargins(6, 4, 6, 4);
+        hbox->setSpacing(4);
 
-        auto* hbox = new QHBoxLayout(eqBox_);
         for (int i = 0; i < kNumBands; ++i) {
             const auto si = static_cast<size_t>(i);
             auto* col = new QVBoxLayout;
             col->setSpacing(2);
 
-            auto* nameLbl = new QLabel(mt::AnalysisSnapshot::kBandNames[si], eqBox_);
+            auto* nameLbl = new QLabel(mt::AnalysisSnapshot::kBandNames[si], body);
             nameLbl->setAlignment(Qt::AlignHCenter);
+            nameLbl->setStyleSheet("font-size: 8pt;");
             col->addWidget(nameLbl);
 
-            auto* readout = new QLabel(QString::fromUtf8("\xe2\x80\x94"), eqBox_);
+            auto* readout = new QLabel(QString::fromUtf8("\xe2\x80\x94"), body);
             readout->setAlignment(Qt::AlignHCenter);
             readout->setStyleSheet("font-size: 9pt; color: #555;");
             eqReadouts_[i] = readout;
             col->addWidget(readout);
 
-            auto* fdr = new VerticalFader(eqBox_);
+            auto* fdr = new VerticalFader(body);
             fdr->setRange(-12.0, 12.0);
             fdr->setSingleStep(0.5);
             fdr->setSuffix(" dB");
@@ -106,65 +98,89 @@ void ChainPanel::buildUi() {
             col->addWidget(fdr, 0, Qt::AlignHCenter);
 
             hbox->addLayout(col);
+            connect(fdr, &AudioControl::valueChanged, this, [this](double) { emitOverride(); });
+        }
 
-            connect(fdr, &AudioControl::valueChanged,
+        eqUnit_ = new RackUnit("eq", "Parametric EQ", body, this);
+        connect(eqUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        outer->addWidget(eqUnit_);
+    }
+
+    // ── Multiband Comp ────────────────────────────────────────────────────────
+    {
+        auto* body = new QWidget;
+        auto* hbox = new QHBoxLayout(body);
+        hbox->setContentsMargins(6, 4, 6, 4);
+        hbox->setSpacing(4);
+
+        for (int i = 0; i < kNumBands; ++i) {
+            const auto si = static_cast<size_t>(i);
+            auto* cell = new QFrame(body);
+            cell->setFrameShape(QFrame::StyledPanel);
+            cell->setStyleSheet(
+                "QFrame { background: #1c1c1c; border: 1px solid #333; border-radius: 4px; }");
+            auto* vbox = new QVBoxLayout(cell);
+            vbox->setContentsMargins(4, 4, 4, 4);
+            vbox->setSpacing(2);
+
+            auto* nameLbl = new QLabel(mt::AnalysisSnapshot::kBandNames[si], cell);
+            nameLbl->setAlignment(Qt::AlignHCenter);
+            nameLbl->setStyleSheet("font-size: 8pt; color: #aaa;");
+            vbox->addWidget(nameLbl);
+
+            auto* thrLbl = new QLabel("Thr", cell);
+            thrLbl->setAlignment(Qt::AlignHCenter);
+            thrLbl->setStyleSheet("font-size: 8pt; color: #888;");
+            vbox->addWidget(thrLbl);
+
+            mbThreshFaders_[i] = new VerticalFader(cell);
+            mbThreshFaders_[i]->setRange(-40.0, 0.0);
+            mbThreshFaders_[i]->setSingleStep(1.0);
+            mbThreshFaders_[i]->setSuffix(" dBFS");
+            mbThreshFaders_[i]->setValue(-20.0);
+            vbox->addWidget(mbThreshFaders_[i], 0, Qt::AlignHCenter);
+
+            auto* sep = new QFrame(cell);
+            sep->setFrameShape(QFrame::HLine);
+            sep->setStyleSheet("background: #333;");
+            sep->setFixedHeight(1);
+            vbox->addWidget(sep);
+
+            auto* ratioLbl = new QLabel("Ratio", cell);
+            ratioLbl->setAlignment(Qt::AlignHCenter);
+            ratioLbl->setStyleSheet("font-size: 8pt; color: #888;");
+            vbox->addWidget(ratioLbl);
+
+            mbRatioKnobs_[i] = new RotaryKnob(cell);
+            mbRatioKnobs_[i]->setRange(1.0, 8.0);
+            mbRatioKnobs_[i]->setSingleStep(0.1);
+            mbRatioKnobs_[i]->setSuffix(":1");
+            mbRatioKnobs_[i]->setValue(1.0);
+            vbox->addWidget(mbRatioKnobs_[i], 0, Qt::AlignHCenter);
+
+            hbox->addWidget(cell);
+            connect(mbThreshFaders_[i], &AudioControl::valueChanged,
+                    this, [this](double) { emitOverride(); });
+            connect(mbRatioKnobs_[i], &AudioControl::valueChanged,
                     this, [this](double) { emitOverride(); });
         }
-        connect(eqBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(eqBox_, 1, 0, 1, 6);
+
+        mbUnit_ = new RackUnit("mbComp", "Multiband Comp", body, this);
+        connect(mbUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        outer->addWidget(mbUnit_);
     }
 
-    // ── Tier 2 col 0-1: Multiband Comp ───────────────────────────────────────
+    // ── Saturator ─────────────────────────────────────────────────────────────
     {
-        mbBox_ = new QGroupBox("Multiband Comp", this);
-        mbBox_->setCheckable(true);
-        mbBox_->setChecked(true);
+        auto* body = new QWidget;
+        auto* vbox = new QVBoxLayout(body);
+        vbox->setContentsMargins(6, 4, 6, 4);
 
-        auto* vbox = new QVBoxLayout(mbBox_);
-        mbCrestLbl_ = new QLabel(QString::fromUtf8("\xe2\x80\x94"), mbBox_);
-        vbox->addWidget(mbCrestLbl_);
-        auto* adv = new QLabel("Advice-driven", mbBox_);
-        adv->setStyleSheet("color: #888; font-style: italic;");
-        vbox->addWidget(adv);
-        vbox->addStretch();
-
-        connect(mbBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(mbBox_, 2, 0, 1, 2);
-    }
-
-    // ── Tier 2 col 2-3: Stereo Width ─────────────────────────────────────────
-    {
-        widthBox_ = new QGroupBox("Stereo Width", this);
-        widthBox_->setCheckable(true);
-        widthBox_->setChecked(true);
-
-        auto* vbox = new QVBoxLayout(widthBox_);
-        widthCorrLbl_ = new QLabel(QString::fromUtf8("\xe2\x80\x94"), widthBox_);
-        vbox->addWidget(widthCorrLbl_);
-        auto* adv = new QLabel("Advice-driven", widthBox_);
-        adv->setStyleSheet("color: #888; font-style: italic;");
-        vbox->addWidget(adv);
-        vbox->addStretch();
-
-        connect(widthBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(widthBox_, 2, 2, 1, 2);
-    }
-
-    // ── Tier 2 col 4-5: Saturator ────────────────────────────────────────────
-    {
-        satBox_ = new QGroupBox("Saturator", this);
-        satBox_->setCheckable(true);
-        satBox_->setChecked(true);
-
-        auto* vbox = new QVBoxLayout(satBox_);
-        satCrestLbl_ = new QLabel(QString::fromUtf8("\xe2\x80\x94"), satBox_);
-        vbox->addWidget(satCrestLbl_);
-
-        auto* drvLbl = new QLabel("Drive", satBox_);
+        auto* drvLbl = new QLabel("Drive", body);
         drvLbl->setAlignment(Qt::AlignHCenter);
         vbox->addWidget(drvLbl);
 
-        satDriveKnob_ = new RotaryKnob(satBox_);
+        satDriveKnob_ = new RotaryKnob(body);
         satDriveKnob_->setRange(0.0, 6.0);
         satDriveKnob_->setSingleStep(0.5);
         satDriveKnob_->setSuffix(" dB");
@@ -172,94 +188,125 @@ void ChainPanel::buildUi() {
         vbox->addWidget(satDriveKnob_, 0, Qt::AlignHCenter);
         vbox->addStretch();
 
+        satUnit_ = new RackUnit("saturator", "Saturator", body, this);
+        connect(satUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
         connect(satDriveKnob_, &AudioControl::valueChanged,
                 this, [this](double) { emitOverride(); });
-        connect(satBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(satBox_, 2, 4, 1, 2);
+        outer->addWidget(satUnit_);
     }
 
-    // ── Tier 3 col 0-3: Mixbus Comp ──────────────────────────────────────────
+    // ── Stereo Width ──────────────────────────────────────────────────────────
     {
-        mixbusBox_ = new QGroupBox("Mixbus Comp", this);
-        mixbusBox_->setCheckable(true);
-        mixbusBox_->setChecked(true);
+        auto* body = new QWidget;
+        auto* hbox = new QHBoxLayout(body);
+        hbox->setContentsMargins(6, 4, 6, 4);
+        hbox->setSpacing(4);
 
-        auto* vbox = new QVBoxLayout(mixbusBox_);
-        auto* row  = new QHBoxLayout;
+        for (int i = 0; i < kNumBands; ++i) {
+            const auto si = static_cast<size_t>(i);
+            auto* col = new QVBoxLayout;
+            col->setSpacing(2);
 
-        auto* thrCol = new QVBoxLayout;
-        auto* thrLbl = new QLabel("Thr", mixbusBox_);
-        thrLbl->setAlignment(Qt::AlignHCenter);
-        thrCol->addWidget(thrLbl);
-        mixbusThreshKnob_ = new RotaryKnob(mixbusBox_);
-        mixbusThreshKnob_->setRange(-40.0, 0.0);
-        mixbusThreshKnob_->setSingleStep(1.0);
-        mixbusThreshKnob_->setSuffix(" dB");
-        mixbusThreshKnob_->setValue(-20.0);
-        thrCol->addWidget(mixbusThreshKnob_, 0, Qt::AlignHCenter);
-        row->addLayout(thrCol);
+            auto* nameLbl = new QLabel(mt::AnalysisSnapshot::kBandNames[si], body);
+            nameLbl->setAlignment(Qt::AlignHCenter);
+            nameLbl->setStyleSheet("font-size: 8pt;");
+            col->addWidget(nameLbl);
 
-        auto* mkupCol = new QVBoxLayout;
-        auto* mkupLbl = new QLabel("Mkup", mixbusBox_);
-        mkupLbl->setAlignment(Qt::AlignHCenter);
-        mkupCol->addWidget(mkupLbl);
-        mixbusMakeupKnob_ = new RotaryKnob(mixbusBox_);
-        mixbusMakeupKnob_->setRange(-12.0, 12.0);
-        mixbusMakeupKnob_->setSingleStep(0.5);
-        mixbusMakeupKnob_->setSuffix(" dB");
-        mixbusMakeupKnob_->setValue(0.0);
-        mkupCol->addWidget(mixbusMakeupKnob_, 0, Qt::AlignHCenter);
-        row->addLayout(mkupCol);
+            widthFaders_[i] = new VerticalFader(body);
+            widthFaders_[i]->setRange(0.0, 2.0);
+            widthFaders_[i]->setSingleStep(0.05);
+            widthFaders_[i]->setValue(1.0);
+            widthFaders_[i]->setSuffix("\xc3\x97");  // ×
+            widthFaders_[i]->setStyleSheet(
+                "VerticalFader QSlider::groove:vertical { background: #1a2a3a; }"
+                "VerticalFader QSlider::handle:vertical { background: #2d5c8a; }");
+            col->addWidget(widthFaders_[i], 0, Qt::AlignHCenter);
 
+            hbox->addLayout(col);
+            connect(widthFaders_[i], &AudioControl::valueChanged,
+                    this, [this](double) { emitOverride(); });
+        }
+
+        widthUnit_ = new RackUnit("stereoWidth", "Stereo Width", body, this);
+        connect(widthUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        outer->addWidget(widthUnit_);
+    }
+
+    // ── Mixbus Comp ───────────────────────────────────────────────────────────
+    {
+        auto* body = new QWidget;
+        auto* row  = new QHBoxLayout(body);
+        row->setContentsMargins(6, 4, 6, 4);
+        row->setSpacing(12);
+
+        auto addKnobCol = [&](const char* label, RotaryKnob*& knobPtr,
+                              double lo, double hi, double step,
+                              const char* suffix, double def) {
+            auto* col    = new QVBoxLayout;
+            auto* lbl    = new QLabel(label, body);
+            lbl->setAlignment(Qt::AlignHCenter);
+            col->addWidget(lbl);
+            knobPtr = new RotaryKnob(body);
+            knobPtr->setRange(lo, hi);
+            knobPtr->setSingleStep(step);
+            knobPtr->setSuffix(QString::fromUtf8(suffix));
+            knobPtr->setValue(def);
+            col->addWidget(knobPtr, 0, Qt::AlignHCenter);
+            row->addLayout(col);
+            connect(knobPtr, &AudioControl::valueChanged,
+                    this, [this](double) { emitOverride(); });
+        };
+
+        addKnobCol("Thr",   mixbusThreshKnob_, -40.0,  0.0, 1.0, " dB",  -20.0);
+        addKnobCol("Ratio", mixbusRatioKnob_,    1.0,  8.0, 0.1, ":1",     2.0);
+        addKnobCol("Mkup",  mixbusMakeupKnob_, -12.0, 12.0, 0.5, " dB",    0.0);
         row->addStretch();
-        vbox->addLayout(row);
 
-        mixbusRmsLbl_ = new QLabel(QString::fromUtf8("\xe2\x80\x94"), mixbusBox_);
-        mixbusRmsLbl_->setStyleSheet("color: #555;");
-        vbox->addWidget(mixbusRmsLbl_);
-
-        connect(mixbusThreshKnob_, &AudioControl::valueChanged,
-                this, [this](double) { emitOverride(); });
-        connect(mixbusMakeupKnob_, &AudioControl::valueChanged,
-                this, [this](double) { emitOverride(); });
-        connect(mixbusBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(mixbusBox_, 3, 0, 1, 4);
+        mixbusUnit_ = new RackUnit("mixbusComp", "Mixbus Comp", body, this);
+        connect(mixbusUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        outer->addWidget(mixbusUnit_);
     }
 
-    // ── Tier 3 col 4-5: Limiter ──────────────────────────────────────────────
+    // ── Limiter ───────────────────────────────────────────────────────────────
     {
-        limBox_ = new QGroupBox("Limiter", this);
-        limBox_->setCheckable(true);
-        limBox_->setChecked(true);
+        auto* body = new QWidget;
+        auto* row  = new QHBoxLayout(body);
+        row->setContentsMargins(6, 4, 6, 4);
+        row->setSpacing(12);
 
-        auto* vbox = new QVBoxLayout(limBox_);
+        auto* targetCol = new QVBoxLayout;
+        auto* targetLbl = new QLabel("Target", body);
+        targetLbl->setAlignment(Qt::AlignHCenter);
+        targetCol->addWidget(targetLbl);
+        limTargetKnob_ = new RotaryKnob(body);
+        limTargetKnob_->setRange(-23.0, -6.0);
+        limTargetKnob_->setSingleStep(0.5);
+        limTargetKnob_->setSuffix(" LUFS");
+        limTargetKnob_->setValue(-14.0);
+        targetCol->addWidget(limTargetKnob_, 0, Qt::AlignHCenter);
+        row->addLayout(targetCol);
 
-        auto* ceilLbl = new QLabel("Ceiling", limBox_);
+        auto* ceilCol = new QVBoxLayout;
+        auto* ceilLbl = new QLabel("Ceiling", body);
         ceilLbl->setAlignment(Qt::AlignHCenter);
-        vbox->addWidget(ceilLbl);
-
-        limCeilingFader_ = new VerticalFader(limBox_);
+        ceilCol->addWidget(ceilLbl);
+        limCeilingFader_ = new VerticalFader(body);
         limCeilingFader_->setRange(-6.0, 0.0);
         limCeilingFader_->setSingleStep(0.5);
         limCeilingFader_->setSuffix(" dBTP");
         limCeilingFader_->setValue(-1.0);
-        vbox->addWidget(limCeilingFader_);
+        ceilCol->addWidget(limCeilingFader_, 0, Qt::AlignHCenter);
+        row->addLayout(ceilCol);
+        row->addStretch();
 
-        limPeakLbl_ = new QLabel(QString::fromUtf8("\xe2\x80\x94"), limBox_);
-        limPeakLbl_->setStyleSheet("color: #555;");
-        vbox->addWidget(limPeakLbl_);
-
-        limLraLbl_ = new QLabel(QString::fromUtf8("\xe2\x80\x94"), limBox_);
-        limLraLbl_->setStyleSheet("color: #555;");
-        vbox->addWidget(limLraLbl_);
-
+        limUnit_ = new RackUnit("limiter", "Limiter", body, this);
+        connect(limUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        connect(limTargetKnob_,   &AudioControl::valueChanged,
+                this, [this](double) { emitOverride(); });
         connect(limCeilingFader_, &AudioControl::valueChanged,
                 this, [this](double) { emitOverride(); });
-        connect(limBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
-        grid->addWidget(limBox_, 3, 4, 1, 2);
+        outer->addWidget(limUnit_);
     }
-
-    outer->addLayout(grid);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
