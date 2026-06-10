@@ -29,6 +29,7 @@ struct TrackAnalysis {
     std::array<float, 7> bandTransientDb{}; // per-band crest factor (dB)
     float                overallRmsDb = 0.f;
     float                overallCorr  = 1.f;
+    float                lra          = 0.f;
 };
 
 // All fields optional; only provided fields become WHERE clauses (AND).

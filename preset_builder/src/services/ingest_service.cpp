@@ -52,6 +52,7 @@ static TrackAnalysis toTrackAnalysis(const mt::AnalysisSnapshot& snap) {
     }
     a.overallRmsDb = snap.overallAvgDb;
     a.overallCorr  = snap.overallCorr;
+    a.lra          = snap.lraLu;
     return a;
 }
 

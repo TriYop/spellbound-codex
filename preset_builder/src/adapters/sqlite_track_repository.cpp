@@ -53,7 +53,7 @@ static const char* kSelectJoin =
     "SELECT t.id, t.path, t.file_size, t.added_at,"
     "       m.title, m.artist, m.album, m.genre, m.year, m.source,"
     "       a.band_rms_db, a.band_corr, a.band_transient_db,"
-    "       a.overall_rms_db, a.overall_corr"
+    "       a.overall_rms_db, a.overall_corr, a.lra"
     "  FROM tracks t"
     "  LEFT JOIN track_metadata m ON m.track_id = t.id"
     "  LEFT JOIN track_analysis a ON a.track_id = t.id";
@@ -88,6 +88,7 @@ static Track stmtToTrack(sqlite3_stmt* st) {
     t.analysis.bandTransientDb = jsonToFloatArray(col(12));
     t.analysis.overallRmsDb    = static_cast<float>(sqlite3_column_double(st, 13));
     t.analysis.overallCorr     = static_cast<float>(sqlite3_column_double(st, 14));
+    t.analysis.lra             = static_cast<float>(sqlite3_column_double(st, 15));
     return t;
 }
 
@@ -131,8 +132,8 @@ void SqliteTrackRepository::save(const Track& t) {
     const auto transJson = floatArrayToJson(t.analysis.bandTransientDb);
     sqlite3_prepare_v2(db,
         "INSERT OR REPLACE INTO track_analysis"
-        "(track_id,band_rms_db,band_corr,band_transient_db,overall_rms_db,overall_corr)"
-        " VALUES(?,?,?,?,?,?);",
+        "(track_id,band_rms_db,band_corr,band_transient_db,overall_rms_db,overall_corr,lra)"
+        " VALUES(?,?,?,?,?,?,?);",
         -1, &st, nullptr);
     sqlite3_bind_text(st, 1, t.id.hash.c_str(),  -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, rmsJson.c_str(),     -1, SQLITE_TRANSIENT);
@@ -140,6 +141,7 @@ void SqliteTrackRepository::save(const Track& t) {
     sqlite3_bind_text(st, 4, transJson.c_str(),   -1, SQLITE_TRANSIENT);
     sqlite3_bind_double(st, 5, static_cast<double>(t.analysis.overallRmsDb));
     sqlite3_bind_double(st, 6, static_cast<double>(t.analysis.overallCorr));
+    sqlite3_bind_double(st, 7, static_cast<double>(t.analysis.lra));
     sqlite3_step(st);
     sqlite3_finalize(st);
 }

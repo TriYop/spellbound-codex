@@ -67,6 +67,10 @@ void Database::createSchema() {
             overall_corr       REAL
         );
     )");
+    // Migration: add lra column to databases created before this column existed.
+    sqlite3_exec(db_,
+        "ALTER TABLE track_analysis ADD COLUMN lra REAL DEFAULT 0;",
+        nullptr, nullptr, nullptr);
     exec(db_, R"(
         CREATE TABLE IF NOT EXISTS presets (
             id          TEXT PRIMARY KEY,
