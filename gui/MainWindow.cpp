@@ -8,7 +8,6 @@
 #include "RotaryKnob.h"
 #include "TargetLevelCombo.h"
 #include "TransportWidget.h"
-#include "VerticalFader.h"
 #include "utils.h"
 #include "mastertweak/report.hpp"
 

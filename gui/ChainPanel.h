@@ -16,7 +16,6 @@ namespace gui {
 class AudioControl;
 class RackUnit;
 class RotaryKnob;
-class VerticalFader;
 }
 
 namespace gui {
@@ -36,16 +35,16 @@ public:
     void clear();
 
     // Original MIDI accessors (wired in MainWindow)
-    VerticalFader* eqGainFader(int band)  const;
+    RotaryKnob*    eqGainFader(int band)  const;
     RotaryKnob*    satDriveKnob()         const;
     RotaryKnob*    mixbusThreshKnob()     const;
     RotaryKnob*    mixbusMakeupKnob()     const;
-    VerticalFader* limCeilingFader()      const;
+    RotaryKnob*    limCeilingFader()      const;
 
     // New MIDI accessors (declared for future wiring — not connected in MainWindow yet)
     RotaryKnob*    mbRatioKnob(int band)   const;
-    VerticalFader* mbThreshFader(int band) const;
-    VerticalFader* widthFader(int band)    const;
+    RotaryKnob*    mbThreshFader(int band) const;
+    RotaryKnob*    widthFader(int band)    const;
     RotaryKnob*    limTargetKnob()         const;
     RotaryKnob*    mixbusRatioKnob()       const;
 
@@ -70,22 +69,22 @@ private:
     QCheckBox* resRowChecks_[kMaxResonances]{};
 
     // Parametric EQ
-    RackUnit*      eqUnit_               = nullptr;
-    QLabel*        eqReadouts_[kNumBands]{};
-    VerticalFader* eqGainFaders_[kNumBands]{};
+    RackUnit*   eqUnit_               = nullptr;
+    QLabel*     eqReadouts_[kNumBands]{};
+    RotaryKnob* eqGainFaders_[kNumBands]{};
 
     // Multiband Comp
-    RackUnit*      mbUnit_               = nullptr;
-    VerticalFader* mbThreshFaders_[kNumBands]{};
-    RotaryKnob*    mbRatioKnobs_[kNumBands]{};
+    RackUnit*   mbUnit_               = nullptr;
+    RotaryKnob* mbThreshFaders_[kNumBands]{};
+    RotaryKnob* mbRatioKnobs_[kNumBands]{};
 
     // Saturator
     RackUnit*   satUnit_       = nullptr;
     RotaryKnob* satDriveKnob_  = nullptr;
 
     // Stereo Width
-    RackUnit*      widthUnit_            = nullptr;
-    VerticalFader* widthFaders_[kNumBands]{};
+    RackUnit*   widthUnit_            = nullptr;
+    RotaryKnob* widthFaders_[kNumBands]{};
 
     // Mixbus Comp
     RackUnit*   mixbusUnit_        = nullptr;
@@ -94,9 +93,9 @@ private:
     RotaryKnob* mixbusMakeupKnob_  = nullptr;
 
     // Limiter
-    RackUnit*      limUnit_          = nullptr;
-    RotaryKnob*    limTargetKnob_    = nullptr;
-    VerticalFader* limCeilingFader_  = nullptr;
+    RackUnit*   limUnit_          = nullptr;
+    RotaryKnob* limTargetKnob_    = nullptr;
+    RotaryKnob* limCeilingFader_  = nullptr;
 };
 
 } // namespace gui
