@@ -20,6 +20,14 @@ struct IngestReport {
     std::vector<std::pair<std::string, std::string>> errors;  // {path, message}
 };
 
+struct ReanalyseReport {
+    int  updated        = 0;
+    int  skippedMissing = 0;  // file no longer on disk
+    int  failed         = 0;
+    bool cancelled      = false;
+    std::vector<std::pair<std::string, std::string>> errors;
+};
+
 class IngestService {
 public:
     // Ingest a single file or a directory (recursive scan for WAV/FLAC/AIFF/AIF/MP3/OGG).
@@ -35,6 +43,14 @@ public:
                         mt::ProgressCallback progress  = {},
                         std::atomic<bool>*   cancel    = nullptr,
                         ErrorCallback        onError   = {}) const;
+
+    // Re-analyse all tracks already in the repository using the current analyseFile()
+    // implementation. Updates analysis fields in-place (needed after schema migrations
+    // that add new fields like lra which default to 0 for existing rows).
+    // Pass a non-null cancel pointer to support cooperative cancellation.
+    ReanalyseReport reanalyse(TrackRepository&     repo,
+                               mt::ProgressCallback progress = {},
+                               std::atomic<bool>*   cancel   = nullptr) const;
 
     // Extract artist and title from a filename (stem only, path prefix stripped).
     // Splits on " - " or " \xe2\x80\x93 " (UTF-8 en-dash).

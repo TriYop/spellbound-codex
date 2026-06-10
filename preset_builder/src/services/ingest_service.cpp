@@ -294,4 +294,92 @@ IngestReport IngestService::ingest(const std::string& path,
     return report;
 }
 
+ReanalyseReport IngestService::reanalyse(TrackRepository&     repo,
+                                          mt::ProgressCallback progress,
+                                          std::atomic<bool>*   cancel) const {
+    ReanalyseReport report;
+    const auto tracks = repo.search({});
+
+    if (tracks.empty()) {
+        if (progress) progress(1.f, "Done");
+        return report;
+    }
+
+    const float    total    = static_cast<float>(tracks.size());
+    const unsigned nThreads = std::max(1u, std::thread::hardware_concurrency());
+    std::atomic<size_t> nextIndex{0};
+    std::atomic<size_t> doneCount{0};
+    std::mutex          mutex;
+
+    auto reportProgress = [&](const std::string& msg) {
+        const size_t n = doneCount.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (progress) progress(static_cast<float>(n) / total, msg);
+    };
+
+    auto processTrack = [&](size_t i) {
+        const Track& track    = tracks[i];
+        const std::string filename = fs::path(track.path).filename().string();
+
+        if (!fs::exists(track.path)) {
+            { std::lock_guard lk(mutex); ++report.skippedMissing; }
+            reportProgress("Missing: " + filename);
+            return;
+        }
+
+        std::string err;
+        const auto audio = mt::readAudioFile(track.path, &err);
+        if (!audio) {
+            const std::string msg = "Read failed: " + err;
+            { std::lock_guard lk(mutex); ++report.failed; report.errors.emplace_back(track.path, msg); }
+            reportProgress("Failed: " + filename);
+            return;
+        }
+
+        const auto snap    = mt::analyseFile(*audio);
+        auto       analysis = toTrackAnalysis(snap);
+        if (audio->sourceFormat == mt::SourceFormat::mp3 ||
+            audio->sourceFormat == mt::SourceFormat::ogg) {
+            const auto corr = mt::computeCodecCorrection(*audio);
+            for (size_t j = 0; j < 7; ++j)
+                analysis.bandRmsDb[j] += corr[j];
+        }
+
+        Track updated    = track;
+        updated.analysis = analysis;
+        { std::lock_guard lk(mutex); repo.save(updated); ++report.updated; }
+        reportProgress("Reanalysed: " + filename);
+    };
+
+    auto workerFn = [&]() noexcept {
+        while (true) {
+            if (cancel && cancel->load(std::memory_order_relaxed)) break;
+            const size_t i = nextIndex.fetch_add(1, std::memory_order_relaxed);
+            if (i >= tracks.size()) break;
+            try {
+                processTrack(i);
+            } catch (const std::exception& ex) {
+                std::lock_guard lk(mutex);
+                ++report.failed;
+                report.errors.emplace_back(tracks[i].path, ex.what());
+            } catch (...) {
+                std::lock_guard lk(mutex);
+                ++report.failed;
+                report.errors.emplace_back(tracks[i].path, "unknown error");
+            }
+        }
+    };
+
+    std::vector<std::thread> threads;
+    threads.reserve(nThreads);
+    for (unsigned t = 0; t < nThreads; ++t)
+        threads.emplace_back(workerFn);
+    for (auto& t : threads) t.join();
+
+    if (cancel && cancel->load(std::memory_order_relaxed))
+        report.cancelled = true;
+
+    if (progress) progress(1.f, report.cancelled ? "Cancelled" : "Done");
+    return report;
+}
+
 } // namespace pb

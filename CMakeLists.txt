@@ -34,6 +34,7 @@ add_subdirectory(third_party)
 add_subdirectory(core)
 add_subdirectory(preset_builder)
 add_subdirectory(cli)
+add_subdirectory(tools)
 
 if(MASTERTWEAK_BUILD_GUI)
     add_subdirectory(gui)
