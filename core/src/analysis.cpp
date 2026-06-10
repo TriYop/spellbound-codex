@@ -1,6 +1,7 @@
 #include "mastertweak/analysis.hpp"
 #include "mastertweak/io.hpp"
 #include "mastertweak/dsp/biquad.hpp"
+#include "mastertweak/dsp/lufs_analyser.hpp"
 
 #include <algorithm>
 #include <array>
@@ -242,6 +243,14 @@ AnalysisSnapshot analyseFile(const AudioFile& audio) {
         const double intDenom = std::sqrt(intSumL2 * intSumR2);
         snap.overallCorr = intDenom > 1e-12
             ? static_cast<float>(std::clamp(intSumLR / intDenom, -1.0, 1.0)) : 1.f;
+    }
+
+    // ── LRA (EBU R128 Loudness Range) ─────────────────────────────────────────
+    {
+        dsp::LufsAnalyser la;
+        la.prepare(sr, audio.numChannels);
+        const auto metrics = la.measureWithLra(audio.samples, audio.numFrames);
+        snap.lraLu = metrics.lra;
     }
 
     return snap;

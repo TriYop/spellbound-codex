@@ -39,6 +39,7 @@ struct AnalysisSnapshot {
     float overallAvgDb  = -100.f;  // broadband L+R average long-term RMS
     float overallPeakDb = -100.f;  // broadband peak-hold smoothed RMS
     float overallCorr   =    1.f;  // broadband integrated Pearson L/R
+    float lraLu         =    0.f;  // EBU R128 Loudness Range (LU); 0 = unknown/silence
 };
 
 // Analyse a whole audio file offline.
