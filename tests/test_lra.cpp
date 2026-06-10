@@ -65,6 +65,23 @@ TEST_CASE("measureWithLra: two-level signal gives LRA in expected range") {
     CHECK(m.lra < 22.f);
 }
 
+TEST_CASE("measureWithLra: signal shorter than 3 s gives LRA = 0") {
+    // 2 s non-silent signal: not enough to fill even one 3 s LRA block → lra must be 0.f
+    const float sr    = 48000.f;
+    const int frames  = static_cast<int>(2.f * sr);
+    std::vector<std::vector<float>> buf(2, std::vector<float>(static_cast<size_t>(frames)));
+    for (int f = 0; f < frames; ++f) {
+        const float s = 0.1f * std::sin(2.f * std::numbers::pi_v<float> * 440.f
+                                         * static_cast<float>(f) / sr);
+        buf[0][static_cast<size_t>(f)] = s;
+        buf[1][static_cast<size_t>(f)] = s;
+    }
+    mt::dsp::LufsAnalyser la;
+    la.prepare(sr, 2);
+    const auto m = la.measureWithLra(buf, frames);
+    CHECK(m.lra == 0.f);
+}
+
 // ── deriveAdvice() LRA offset ─────────────────────────────────────────────────
 
 static mt::PresetData makeLraTestPreset() {

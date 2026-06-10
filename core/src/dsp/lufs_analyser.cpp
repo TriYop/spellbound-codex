@@ -7,6 +7,11 @@
 
 namespace mt::dsp {
 
+namespace {
+// 10^((-70 + 0.691) / 10) — absolute gate threshold (−70 LUFS) in mean-square power units
+constexpr double kAbsGateZ = 1.1724e-7;
+}
+
 // ── K-weighting coefficient factories ────────────────────────────────────────
 //
 // BS.1770 Stage 1: 2nd-order high-shelf, f0=1681.97 Hz, +4 dB gain, Q=0.7072.
@@ -99,7 +104,6 @@ std::vector<double> LufsAnalyser::blockPowers(
 // EBU R128 integrated LUFS from pre-computed block powers:
 //   absolute gate -70 LUFS, relative gate -10 LU.
 float LufsAnalyser::integratedLufsFromBlocks(const std::vector<double>& blocks) const {
-    constexpr double kAbsGateZ = 1.1724e-7;  // 10^((-70+0.691)/10)
     std::vector<double> g1;
     for (double z : blocks)
         if (z >= kAbsGateZ) g1.push_back(z);
@@ -142,7 +146,6 @@ LoudnessMetrics LufsAnalyser::measureWithLra(
     result.integratedLufs = integratedLufsFromBlocks(intBlocks);
 
     // ── LRA (3 s blocks, -20 LU relative gate, P95 - P10) ────────────────────
-    constexpr double kAbsGateZ = 1.1724e-7;
     std::vector<double> g1;
     for (double z : lraBlocks)
         if (z >= kAbsGateZ) g1.push_back(z);
