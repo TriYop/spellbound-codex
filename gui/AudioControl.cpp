@@ -60,6 +60,11 @@ void AudioControl::setSuffix(const QString& s) {
     update();
 }
 
+void AudioControl::setValueColor(const QColor& c) {
+    valueColor_ = c;
+    update();
+}
+
 void AudioControl::clampAndEmit(double v) {
     value_ = std::clamp(v, minVal_, maxVal_);
     update();
@@ -83,7 +88,7 @@ void AudioControl::paintEvent(QPaintEvent*) {
     const QString valStr = (value_ > 0.0 ? "+" : "") +
                            QString::number(value_, 'f', 1) + suffix_;
 
-    p.setPen(QColor("#222222"));
+    p.setPen(valueColor_);
     QFont lf = font();
     lf.setPointSize(8);
     p.setFont(lf);

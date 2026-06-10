@@ -62,6 +62,8 @@ void ChainPanel::buildUi() {
 
         resUnit_ = new RackUnit("resEq", "Resonance EQ", body, this);
         connect(resUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        resUnit_->setStats(QString::fromUtf8("\xe2\x80\x94"));
+        resUnit_->setBadge("auto", false);
         outer->addWidget(resUnit_);
     }
 
@@ -98,6 +100,7 @@ void ChainPanel::buildUi() {
             eqGainFaders_[i]->setSingleStep(0.5);
             eqGainFaders_[i]->setSuffix(" dB");
             eqGainFaders_[i]->setValue(0.0);
+            eqGainFaders_[i]->setValueColor(QColor("#e06060"));
             vbox->addWidget(eqGainFaders_[i], 0, Qt::AlignHCenter);
 
             hbox->addWidget(cell);
@@ -107,6 +110,8 @@ void ChainPanel::buildUi() {
 
         eqUnit_ = new RackUnit("eq", "Parametric EQ", body, this);
         connect(eqUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        eqUnit_->setStats(QString::fromUtf8("\xe2\x80\x94"));
+        eqUnit_->setBadge("auto", false);
         outer->addWidget(eqUnit_);
     }
 
@@ -142,6 +147,7 @@ void ChainPanel::buildUi() {
             mbThreshFaders_[i]->setSingleStep(1.0);
             mbThreshFaders_[i]->setSuffix(" dBFS");
             mbThreshFaders_[i]->setValue(-20.0);
+            mbThreshFaders_[i]->setValueColor(QColor("#4ecfcf"));
             vbox->addWidget(mbThreshFaders_[i], 0, Qt::AlignHCenter);
 
             auto* sep = new QFrame(cell);
@@ -160,6 +166,7 @@ void ChainPanel::buildUi() {
             mbRatioKnobs_[i]->setSingleStep(0.1);
             mbRatioKnobs_[i]->setSuffix(":1");
             mbRatioKnobs_[i]->setValue(1.0);
+            mbRatioKnobs_[i]->setValueColor(QColor("#4cc94c"));
             vbox->addWidget(mbRatioKnobs_[i], 0, Qt::AlignHCenter);
 
             hbox->addWidget(cell);
@@ -171,43 +178,49 @@ void ChainPanel::buildUi() {
 
         mbUnit_ = new RackUnit("mbComp", "Multiband Comp", body, this);
         connect(mbUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        mbUnit_->setStats(QString::fromUtf8("\xe2\x80\x94"));
+        mbUnit_->setBadge("auto", false);
         outer->addWidget(mbUnit_);
     }
 
     // ── Saturator ─────────────────────────────────────────────────────────────
     {
-        auto* body = new QWidget;
-        auto* row  = new QHBoxLayout(body);
-        row->setContentsMargins(6, 4, 6, 4);
-        row->setSpacing(4);
+        auto* body  = new QWidget;
+        auto* outer2 = new QVBoxLayout(body);
+        outer2->setContentsMargins(6, 4, 6, 4);
+        outer2->setSpacing(0);
 
-        auto* cell = new QFrame(body);
-        cell->setFrameShape(QFrame::StyledPanel);
-        cell->setStyleSheet(
+        auto* block = new QFrame(body);
+        block->setFrameShape(QFrame::StyledPanel);
+        block->setStyleSheet(
             "QFrame { background: #1c1c1c; border: 1px solid #333; border-radius: 4px; }");
-        auto* vbox = new QVBoxLayout(cell);
-        vbox->setContentsMargins(4, 4, 4, 4);
-        vbox->setSpacing(2);
+        auto* blockRow = new QHBoxLayout(block);
+        blockRow->setContentsMargins(12, 8, 12, 8);
+        blockRow->setSpacing(16);
 
-        auto* drvLbl = new QLabel("Drive", cell);
+        auto* drvCol = new QVBoxLayout;
+        auto* drvLbl = new QLabel("Drive", block);
         drvLbl->setAlignment(Qt::AlignHCenter);
         drvLbl->setStyleSheet("font-size: 8pt; color: #aaa;");
-        vbox->addWidget(drvLbl);
-
-        satDriveKnob_ = new RotaryKnob(cell);
+        drvCol->addWidget(drvLbl);
+        satDriveKnob_ = new RotaryKnob(block);
         satDriveKnob_->setRange(0.0, 6.0);
         satDriveKnob_->setSingleStep(0.5);
         satDriveKnob_->setSuffix(" dB");
         satDriveKnob_->setValue(0.0);
-        vbox->addWidget(satDriveKnob_, 0, Qt::AlignHCenter);
+        satDriveKnob_->setValueColor(QColor("#e06060"));
+        drvCol->addWidget(satDriveKnob_, 0, Qt::AlignHCenter);
+        blockRow->addLayout(drvCol);
+        blockRow->addStretch();
 
-        row->addWidget(cell);
-        row->addStretch();
+        outer2->addWidget(block);
 
         satUnit_ = new RackUnit("saturator", "Saturator", body, this);
         connect(satUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
         connect(satDriveKnob_, &AudioControl::valueChanged,
                 this, [this](double) { emitOverride(); });
+        satUnit_->setStats(QString::fromUtf8("\xe2\x80\x94"));
+        satUnit_->setBadge("auto", false);
         outer->addWidget(satUnit_);
     }
 
@@ -238,6 +251,7 @@ void ChainPanel::buildUi() {
             widthFaders_[i]->setSingleStep(0.05);
             widthFaders_[i]->setValue(1.0);
             widthFaders_[i]->setSuffix("\xc3\x97");  // ×
+            widthFaders_[i]->setValueColor(QColor("#e0e0e0"));
             vbox->addWidget(widthFaders_[i], 0, Qt::AlignHCenter);
 
             hbox->addWidget(cell);
@@ -247,96 +261,105 @@ void ChainPanel::buildUi() {
 
         widthUnit_ = new RackUnit("stereoWidth", "Stereo Width", body, this);
         connect(widthUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        widthUnit_->setStats(QString::fromUtf8("\xe2\x80\x94"));
+        widthUnit_->setBadge("auto", false);
         outer->addWidget(widthUnit_);
     }
 
     // ── Mixbus Comp ───────────────────────────────────────────────────────────
     {
-        auto* body = new QWidget;
-        auto* row  = new QHBoxLayout(body);
-        row->setContentsMargins(6, 4, 6, 4);
-        row->setSpacing(12);
+        auto* body   = new QWidget;
+        auto* outer2 = new QVBoxLayout(body);
+        outer2->setContentsMargins(6, 4, 6, 4);
+        outer2->setSpacing(0);
 
-        auto addKnobCell = [&](const char* label, RotaryKnob*& knobPtr,
-                               double lo, double hi, double step,
-                               const char* suffix, double def) {
-            auto* cell = new QFrame(body);
-            cell->setFrameShape(QFrame::StyledPanel);
-            cell->setStyleSheet(
-                "QFrame { background: #1c1c1c; border: 1px solid #333; border-radius: 4px; }");
-            auto* vbox = new QVBoxLayout(cell);
-            vbox->setContentsMargins(4, 4, 4, 4);
-            vbox->setSpacing(2);
-            auto* lbl = new QLabel(label, cell);
+        auto* block = new QFrame(body);
+        block->setFrameShape(QFrame::StyledPanel);
+        block->setStyleSheet(
+            "QFrame { background: #1c1c1c; border: 1px solid #333; border-radius: 4px; }");
+        auto* blockRow = new QHBoxLayout(block);
+        blockRow->setContentsMargins(12, 8, 12, 8);
+        blockRow->setSpacing(16);
+
+        auto addKnobCol = [&](const char* label, RotaryKnob*& knobPtr,
+                              double lo, double hi, double step,
+                              const char* suffix, double def, QColor valColor) {
+            auto* col = new QVBoxLayout;
+            auto* lbl = new QLabel(label, block);
             lbl->setAlignment(Qt::AlignHCenter);
             lbl->setStyleSheet("font-size: 8pt; color: #aaa;");
-            vbox->addWidget(lbl);
-            knobPtr = new RotaryKnob(cell);
+            col->addWidget(lbl);
+            knobPtr = new RotaryKnob(block);
             knobPtr->setRange(lo, hi);
             knobPtr->setSingleStep(step);
             knobPtr->setSuffix(QString::fromUtf8(suffix));
             knobPtr->setValue(def);
-            vbox->addWidget(knobPtr, 0, Qt::AlignHCenter);
-            row->addWidget(cell);
+            knobPtr->setValueColor(valColor);
+            col->addWidget(knobPtr, 0, Qt::AlignHCenter);
+            blockRow->addLayout(col);
             connect(knobPtr, &AudioControl::valueChanged,
                     this, [this](double) { emitOverride(); });
         };
 
-        addKnobCell("Thr",   mixbusThreshKnob_, -40.0,  0.0, 1.0, " dB",  -20.0);
-        addKnobCell("Ratio", mixbusRatioKnob_,    1.0,  8.0, 0.1, ":1",     2.0);
-        addKnobCell("Mkup",  mixbusMakeupKnob_, -12.0, 12.0, 0.5, " dB",    0.0);
-        row->addStretch();
+        addKnobCol("Thr",   mixbusThreshKnob_, -40.0,  0.0, 1.0, " dB",  -20.0, QColor("#4ecfcf"));
+        addKnobCol("Ratio", mixbusRatioKnob_,    1.0,  8.0, 0.1, ":1",     2.0, QColor("#4cc94c"));
+        addKnobCol("Mkup",  mixbusMakeupKnob_, -12.0, 12.0, 0.5, " dB",    0.0, QColor("#e06060"));
+        blockRow->addStretch();
+
+        outer2->addWidget(block);
 
         mixbusUnit_ = new RackUnit("mixbusComp", "Mixbus Comp", body, this);
         connect(mixbusUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
+        mixbusUnit_->setStats(QString::fromUtf8("\xe2\x80\x94"));
+        mixbusUnit_->setBadge("auto", false);
         outer->addWidget(mixbusUnit_);
     }
 
     // ── Limiter ───────────────────────────────────────────────────────────────
     {
-        auto* body = new QWidget;
-        auto* row  = new QHBoxLayout(body);
-        row->setContentsMargins(6, 4, 6, 4);
-        row->setSpacing(12);
+        auto* body   = new QWidget;
+        auto* outer2 = new QVBoxLayout(body);
+        outer2->setContentsMargins(6, 4, 6, 4);
+        outer2->setSpacing(0);
 
-        auto* targetCell = new QFrame(body);
-        targetCell->setFrameShape(QFrame::StyledPanel);
-        targetCell->setStyleSheet(
+        auto* block = new QFrame(body);
+        block->setFrameShape(QFrame::StyledPanel);
+        block->setStyleSheet(
             "QFrame { background: #1c1c1c; border: 1px solid #333; border-radius: 4px; }");
-        auto* targetVbox = new QVBoxLayout(targetCell);
-        targetVbox->setContentsMargins(4, 4, 4, 4);
-        targetVbox->setSpacing(2);
-        auto* targetLbl = new QLabel("Target", targetCell);
+        auto* blockRow = new QHBoxLayout(block);
+        blockRow->setContentsMargins(12, 8, 12, 8);
+        blockRow->setSpacing(16);
+
+        auto* targetCol = new QVBoxLayout;
+        auto* targetLbl = new QLabel("Target", block);
         targetLbl->setAlignment(Qt::AlignHCenter);
         targetLbl->setStyleSheet("font-size: 8pt; color: #aaa;");
-        targetVbox->addWidget(targetLbl);
-        limTargetKnob_ = new RotaryKnob(targetCell);
+        targetCol->addWidget(targetLbl);
+        limTargetKnob_ = new RotaryKnob(block);
         limTargetKnob_->setRange(-23.0, -6.0);
         limTargetKnob_->setSingleStep(0.5);
         limTargetKnob_->setSuffix(" LUFS");
         limTargetKnob_->setValue(-14.0);
-        targetVbox->addWidget(limTargetKnob_, 0, Qt::AlignHCenter);
-        row->addWidget(targetCell);
+        limTargetKnob_->setValueColor(QColor("#e06060"));
+        targetCol->addWidget(limTargetKnob_, 0, Qt::AlignHCenter);
+        blockRow->addLayout(targetCol);
 
-        auto* ceilCell = new QFrame(body);
-        ceilCell->setFrameShape(QFrame::StyledPanel);
-        ceilCell->setStyleSheet(
-            "QFrame { background: #1c1c1c; border: 1px solid #333; border-radius: 4px; }");
-        auto* ceilVbox = new QVBoxLayout(ceilCell);
-        ceilVbox->setContentsMargins(4, 4, 4, 4);
-        ceilVbox->setSpacing(2);
-        auto* ceilLbl = new QLabel("Ceiling", ceilCell);
+        auto* ceilCol = new QVBoxLayout;
+        auto* ceilLbl = new QLabel("Ceiling", block);
         ceilLbl->setAlignment(Qt::AlignHCenter);
         ceilLbl->setStyleSheet("font-size: 8pt; color: #aaa;");
-        ceilVbox->addWidget(ceilLbl);
-        limCeilingFader_ = new RotaryKnob(ceilCell);
+        ceilCol->addWidget(ceilLbl);
+        limCeilingFader_ = new RotaryKnob(block);
         limCeilingFader_->setRange(-6.0, 0.0);
         limCeilingFader_->setSingleStep(0.5);
         limCeilingFader_->setSuffix(" dBTP");
         limCeilingFader_->setValue(-1.0);
-        ceilVbox->addWidget(limCeilingFader_, 0, Qt::AlignHCenter);
-        row->addWidget(ceilCell);
-        row->addStretch();
+        limCeilingFader_->setValueColor(QColor("#e06060"));
+        ceilCol->addWidget(limCeilingFader_, 0, Qt::AlignHCenter);
+        blockRow->addLayout(ceilCol);
+        blockRow->addStretch();
+
+        outer2->addWidget(block);
 
         limUnit_ = new RackUnit("limiter", "Limiter", body, this);
         connect(limUnit_, &RackUnit::bypassChanged, this, [this](bool) { emitOverride(); });
@@ -344,6 +367,8 @@ void ChainPanel::buildUi() {
                 this, [this](double) { emitOverride(); });
         connect(limCeilingFader_, &AudioControl::valueChanged,
                 this, [this](double) { emitOverride(); });
+        limUnit_->setStats(QString::fromUtf8("\xe2\x80\x94"));
+        limUnit_->setBadge("auto", false);
         outer->addWidget(limUnit_);
     }
 }
@@ -569,7 +594,7 @@ void ChainPanel::clear() {
         u->setBypassed(false);
         u->blockSignals(false);
         u->setStats(QString::fromUtf8("\xe2\x80\x94"));
-        u->setBadge(QString{});
+        u->setBadge("auto", false);
     }
     resUnit_->blockSignals(true);
     resUnit_->setBypassed(true);   // no analysis → resonance unit is always inactive after clear

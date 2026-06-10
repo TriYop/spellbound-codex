@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QWidget>
 
 QT_BEGIN_NAMESPACE
@@ -21,8 +22,9 @@ public:
     double value() const;
     void   setRange(double min, double max);
     void   setSingleStep(double step);
-    void   setClean(double baseline);   // dirty dot shown when value ≠ baseline
-    void   setSuffix(const QString& s); // e.g. " dB", " dBTP"
+    void   setClean(double baseline);        // dirty dot shown when value ≠ baseline
+    void   setSuffix(const QString& s);      // e.g. " dB", " dBTP"
+    void   setValueColor(const QColor& c);   // color of the value label text
     double minimum() const { return minVal_; }
     double maximum() const { return maxVal_; }
 
@@ -36,12 +38,13 @@ protected:
     // Exposed so subclasses can compute correct sizeHint().
     static constexpr int kLabelH = 20;
 
-    double  value_    = 0.0;
-    double  minVal_   = 0.0;
-    double  maxVal_   = 1.0;
-    double  step_     = 0.1;
-    double  cleanVal_ = 0.0;
+    double  value_      = 0.0;
+    double  minVal_     = 0.0;
+    double  maxVal_     = 1.0;
+    double  step_       = 0.1;
+    double  cleanVal_   = 0.0;
     QString suffix_;
+    QColor  valueColor_ = QColor("#cccccc");
 
 private:
     void paintEvent(QPaintEvent*) override final;
