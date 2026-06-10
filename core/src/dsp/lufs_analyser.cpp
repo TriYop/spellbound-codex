@@ -118,4 +118,111 @@ float LufsAnalyser::measure(const std::vector<std::vector<float>>& samples,
     return static_cast<float>(-0.691 + 10.0 * std::log10(mean));
 }
 
+LoudnessMetrics LufsAnalyser::measureWithLra(
+        const std::vector<std::vector<float>>& samples, int numFrames) {
+    const auto nch = static_cast<size_t>(numChannels_);
+    const int lraBlockSize = static_cast<int>(3.0f * sampleRate_);  // 3 s in samples
+
+    // ── K-weight entire buffer (shared pass) ──────────────────────────────────
+    std::vector<std::vector<float>> kw(nch,
+        std::vector<float>(static_cast<size_t>(numFrames)));
+    for (size_t ch = 0; ch < nch; ++ch) {
+        BiquadState s1{}, s2{};
+        for (int f = 0; f < numFrames; ++f) {
+            const float x  = samples[ch][static_cast<size_t>(f)];
+            const float y1 = biquadProcess(stage1_, s1, x);
+            kw[ch][static_cast<size_t>(f)] = biquadProcess(stage2_, s2, y1);
+        }
+    }
+
+    // ── Accumulate block powers (400 ms and 3 s), same 100 ms hop ────────────
+    std::vector<double> intBlocks;
+    std::vector<double> lraBlocks;
+
+    for (int offset = 0; offset + blockSize_ <= numFrames; offset += hopSize_) {
+        // 400 ms block
+        {
+            double z = 0.0;
+            for (size_t ch = 0; ch < nch; ++ch) {
+                double sumSq = 0.0;
+                for (int f = offset; f < offset + blockSize_; ++f)
+                    sumSq += static_cast<double>(kw[ch][static_cast<size_t>(f)])
+                           * kw[ch][static_cast<size_t>(f)];
+                z += sumSq / blockSize_;
+            }
+            intBlocks.push_back(z);
+        }
+        // 3 s block (only when it fits)
+        if (offset + lraBlockSize <= numFrames) {
+            double z = 0.0;
+            for (size_t ch = 0; ch < nch; ++ch) {
+                double sumSq = 0.0;
+                for (int f = offset; f < offset + lraBlockSize; ++f)
+                    sumSq += static_cast<double>(kw[ch][static_cast<size_t>(f)])
+                           * kw[ch][static_cast<size_t>(f)];
+                z += sumSq / lraBlockSize;
+            }
+            lraBlocks.push_back(z);
+        }
+    }
+
+    LoudnessMetrics result;
+    constexpr double kAbsGateZ = 1.1724e-7;  // -70 LUFS threshold in power domain
+
+    // ── Integrated LUFS (400 ms blocks, -10 LU relative gate) ────────────────
+    {
+        std::vector<double> g1;
+        for (double z : intBlocks)
+            if (z >= kAbsGateZ) g1.push_back(z);
+        if (!g1.empty()) {
+            double Jg = 0.0;
+            for (double z : g1) Jg += z;
+            Jg /= static_cast<double>(g1.size());
+            const double relGateZ = Jg * 0.1;  // -10 LU = power × 0.1
+            std::vector<double> g2;
+            for (double z : g1)
+                if (z >= relGateZ) g2.push_back(z);
+            if (!g2.empty()) {
+                double mean = 0.0;
+                for (double z : g2) mean += z;
+                mean /= static_cast<double>(g2.size());
+                result.integratedLufs =
+                    static_cast<float>(-0.691 + 10.0 * std::log10(mean));
+            }
+        }
+    }
+
+    // ── LRA (3 s blocks, -20 LU relative gate, P95 - P10) ────────────────────
+    {
+        std::vector<double> g1;
+        for (double z : lraBlocks)
+            if (z >= kAbsGateZ) g1.push_back(z);
+        if (g1.size() >= 2) {
+            double Jg = 0.0;
+            for (double z : g1) Jg += z;
+            Jg /= static_cast<double>(g1.size());
+            const double relGateZ = Jg * 0.01;  // -20 LU = power × 0.01
+            std::vector<float> lufsVals;
+            for (double z : g1) {
+                if (z >= relGateZ)
+                    lufsVals.push_back(
+                        static_cast<float>(-0.691 + 10.0 * std::log10(z)));
+            }
+            if (lufsVals.size() >= 2) {
+                std::sort(lufsVals.begin(), lufsVals.end());
+                const auto n = lufsVals.size();
+                auto idx = [n](float p) -> size_t {
+                    return static_cast<size_t>(
+                        std::clamp(static_cast<int>(
+                            std::floor(p * static_cast<float>(n))),
+                            0, static_cast<int>(n) - 1));
+                };
+                result.lra = std::max(0.f, lufsVals[idx(0.95f)] - lufsVals[idx(0.10f)]);
+            }
+        }
+    }
+
+    return result;
+}
+
 } // namespace mt::dsp

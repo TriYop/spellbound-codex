@@ -14,6 +14,7 @@ add_executable(mastertweak_tests
     test_midi_mapping.cpp
     test_similarity_service.cpp
     test_resonance_detector.cpp
+    test_lra.cpp
 )
 
 target_link_libraries(mastertweak_tests

@@ -6,6 +6,11 @@
 
 namespace mt::dsp {
 
+struct LoudnessMetrics {
+    float integratedLufs = -70.f;  // EBU R128 integrated loudness (LUFS)
+    float lra            =   0.f;  // EBU R128 Loudness Range (LU); 0 = silence/unknown
+};
+
 // EBU R128 integrated loudness measurement (ITU-R BS.1770-4).
 // K-weighting: Stage 1 high-shelf (1682 Hz, +4 dB) + Stage 2 high-pass (38 Hz).
 // 400 ms blocks, 75% overlap, absolute gate -70 LUFS, relative gate -10 LU.
@@ -17,6 +22,11 @@ public:
 
     // Measure integrated LUFS of the full buffer [numChannels × numFrames].
     float measure(const std::vector<std::vector<float>>& samples, int numFrames);
+
+    // Measure integrated LUFS (400 ms blocks, -10 LU gate) and LRA
+    // (3 s blocks, -20 LU gate, P95-P10) in one K-weighting pass.
+    LoudnessMetrics measureWithLra(const std::vector<std::vector<float>>& samples,
+                                   int numFrames);
 
 private:
     static BiquadCoeffs kWeightingStage1(double sr);
