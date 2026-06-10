@@ -32,6 +32,14 @@ private:
     static BiquadCoeffs kWeightingStage1(double sr);
     static BiquadCoeffs kWeightingStage2(double sr);
 
+    // Shared computation helpers
+    std::vector<std::vector<float>> kWeightBuffer(
+        const std::vector<std::vector<float>>& samples, int numFrames) const;
+    std::vector<double> blockPowers(
+        const std::vector<std::vector<float>>& kw,
+        int numFrames, int windowSamples) const;
+    float integratedLufsFromBlocks(const std::vector<double>& blocks) const;
+
     float sampleRate_  = 48000.f;
     int   numChannels_ = 2;
     int   blockSize_   = 0;   // 400 ms in samples

@@ -56,13 +56,14 @@ void LufsAnalyser::prepare(float sampleRate, int numChannels) {
     stage2_ = kWeightingStage2(static_cast<double>(sampleRate));
 }
 
-float LufsAnalyser::measure(const std::vector<std::vector<float>>& samples,
-                             int numFrames) {
-    const auto nch = static_cast<size_t>(numChannels_);
+// ── Private helpers ───────────────────────────────────────────────────────────
 
-    // ── Step 1: K-weight entire buffer per channel (single pass, O(n)) ───────
-    // Pre-filtering the full buffer avoids restarting filter state per block
-    // (which would be O(n²) in the number of blocks).
+// K-weight entire buffer per channel (single pass, O(n)).
+// Pre-filtering the full buffer avoids restarting filter state per block
+// (which would be O(n²) in the number of blocks).
+std::vector<std::vector<float>> LufsAnalyser::kWeightBuffer(
+        const std::vector<std::vector<float>>& samples, int numFrames) const {
+    const auto nch = static_cast<size_t>(numChannels_);
     std::vector<std::vector<float>> kw(nch, std::vector<float>(static_cast<size_t>(numFrames)));
     for (size_t ch = 0; ch < nch; ++ch) {
         BiquadState s1{}, s2{};
@@ -72,153 +73,101 @@ float LufsAnalyser::measure(const std::vector<std::vector<float>>& samples,
             kw[ch][static_cast<size_t>(f)] = biquadProcess(stage2_, s2, y1);
         }
     }
+    return kw;
+}
 
-    // ── Step 2: Compute mean-square power per 400ms block (75% overlap) ──────
-    std::vector<double> blockPowers;
-    for (int offset = 0; offset + blockSize_ <= numFrames; offset += hopSize_) {
+// Compute mean-square power per window of windowSamples (75% overlap via hopSize_).
+std::vector<double> LufsAnalyser::blockPowers(
+        const std::vector<std::vector<float>>& kw,
+        int numFrames, int windowSamples) const {
+    const auto nch = static_cast<size_t>(numChannels_);
+    std::vector<double> powers;
+    for (int offset = 0; offset + windowSamples <= numFrames; offset += hopSize_) {
         double z = 0.0;
         for (size_t ch = 0; ch < nch; ++ch) {
             double sumSq = 0.0;
-            for (int f = offset; f < offset + blockSize_; ++f)
+            for (int f = offset; f < offset + windowSamples; ++f)
                 sumSq += static_cast<double>(kw[ch][static_cast<size_t>(f)])
                        * kw[ch][static_cast<size_t>(f)];
-            z += sumSq / blockSize_;  // mean square, this channel
+            z += sumSq / windowSamples;
         }
-        blockPowers.push_back(z);
+        powers.push_back(z);
     }
+    return powers;
+}
 
-    if (blockPowers.empty()) return -70.f;
+// EBU R128 integrated LUFS from pre-computed block powers:
+//   absolute gate -70 LUFS, relative gate -10 LU.
+float LufsAnalyser::integratedLufsFromBlocks(const std::vector<double>& blocks) const {
+    constexpr double kAbsGateZ = 1.1724e-7;  // 10^((-70+0.691)/10)
+    std::vector<double> g1;
+    for (double z : blocks)
+        if (z >= kAbsGateZ) g1.push_back(z);
+    if (g1.empty()) return -70.f;
 
-    // ── Step 3: Absolute gate — discard blocks below -70 LUFS ────────────────
-    // -70 LUFS ↔ -0.691 + 10*log10(z) = -70 → z = 10^((-70+0.691)/10)
-    constexpr double kAbsGateZ = 1.1724e-7;  // 10^(-6.9309): -0.691 + 10*log10(z) = -70
-    std::vector<double> gated1;
-    for (double z : blockPowers)
-        if (z >= kAbsGateZ) gated1.push_back(z);
-
-    if (gated1.empty()) return -70.f;
-
-    // ── Step 4: Relative gate — discard blocks > 10 LU below ungated mean ────
     double Jg = 0.0;
-    for (double z : gated1) Jg += z;
-    Jg /= static_cast<double>(gated1.size());
+    for (double z : g1) Jg += z;
+    Jg /= static_cast<double>(g1.size());
+    const double relGateZ = Jg * 0.1;  // -10 LU = power × 0.1
 
-    const double relGateZ = Jg * 0.1;  // 10 LU = factor 10 in power
-    std::vector<double> gated2;
-    for (double z : gated1)
-        if (z >= relGateZ) gated2.push_back(z);
+    std::vector<double> g2;
+    for (double z : g1)
+        if (z >= relGateZ) g2.push_back(z);
+    if (g2.empty()) return -70.f;
 
-    if (gated2.empty()) return -70.f;
-
-    // ── Step 5: Gated mean and LUFS ──────────────────────────────────────────
     double mean = 0.0;
-    for (double z : gated2) mean += z;
-    mean /= static_cast<double>(gated2.size());
-
+    for (double z : g2) mean += z;
+    mean /= static_cast<double>(g2.size());
     return static_cast<float>(-0.691 + 10.0 * std::log10(mean));
+}
+
+// ── Public methods ────────────────────────────────────────────────────────────
+
+float LufsAnalyser::measure(const std::vector<std::vector<float>>& samples,
+                             int numFrames) {
+    const auto kw     = kWeightBuffer(samples, numFrames);
+    const auto blocks = blockPowers(kw, numFrames, blockSize_);
+    return integratedLufsFromBlocks(blocks);
 }
 
 LoudnessMetrics LufsAnalyser::measureWithLra(
         const std::vector<std::vector<float>>& samples, int numFrames) {
-    const auto nch = static_cast<size_t>(numChannels_);
-    const int lraBlockSize = static_cast<int>(3.0f * sampleRate_);  // 3 s in samples
+    const int lraBlockSize = static_cast<int>(3.0f * sampleRate_);
 
-    // ── K-weight entire buffer (shared pass) ──────────────────────────────────
-    std::vector<std::vector<float>> kw(nch,
-        std::vector<float>(static_cast<size_t>(numFrames)));
-    for (size_t ch = 0; ch < nch; ++ch) {
-        BiquadState s1{}, s2{};
-        for (int f = 0; f < numFrames; ++f) {
-            const float x  = samples[ch][static_cast<size_t>(f)];
-            const float y1 = biquadProcess(stage1_, s1, x);
-            kw[ch][static_cast<size_t>(f)] = biquadProcess(stage2_, s2, y1);
-        }
-    }
-
-    // ── Accumulate block powers (400 ms and 3 s), same 100 ms hop ────────────
-    std::vector<double> intBlocks;
-    std::vector<double> lraBlocks;
-
-    for (int offset = 0; offset + blockSize_ <= numFrames; offset += hopSize_) {
-        // 400 ms block
-        {
-            double z = 0.0;
-            for (size_t ch = 0; ch < nch; ++ch) {
-                double sumSq = 0.0;
-                for (int f = offset; f < offset + blockSize_; ++f)
-                    sumSq += static_cast<double>(kw[ch][static_cast<size_t>(f)])
-                           * kw[ch][static_cast<size_t>(f)];
-                z += sumSq / blockSize_;
-            }
-            intBlocks.push_back(z);
-        }
-        // 3 s block (only when it fits)
-        if (offset + lraBlockSize <= numFrames) {
-            double z = 0.0;
-            for (size_t ch = 0; ch < nch; ++ch) {
-                double sumSq = 0.0;
-                for (int f = offset; f < offset + lraBlockSize; ++f)
-                    sumSq += static_cast<double>(kw[ch][static_cast<size_t>(f)])
-                           * kw[ch][static_cast<size_t>(f)];
-                z += sumSq / lraBlockSize;
-            }
-            lraBlocks.push_back(z);
-        }
-    }
+    const auto kw        = kWeightBuffer(samples, numFrames);
+    const auto intBlocks = blockPowers(kw, numFrames, blockSize_);
+    const auto lraBlocks = blockPowers(kw, numFrames, lraBlockSize);
 
     LoudnessMetrics result;
-    constexpr double kAbsGateZ = 1.1724e-7;  // -70 LUFS threshold in power domain
-
-    // ── Integrated LUFS (400 ms blocks, -10 LU relative gate) ────────────────
-    {
-        std::vector<double> g1;
-        for (double z : intBlocks)
-            if (z >= kAbsGateZ) g1.push_back(z);
-        if (!g1.empty()) {
-            double Jg = 0.0;
-            for (double z : g1) Jg += z;
-            Jg /= static_cast<double>(g1.size());
-            const double relGateZ = Jg * 0.1;  // -10 LU = power × 0.1
-            std::vector<double> g2;
-            for (double z : g1)
-                if (z >= relGateZ) g2.push_back(z);
-            if (!g2.empty()) {
-                double mean = 0.0;
-                for (double z : g2) mean += z;
-                mean /= static_cast<double>(g2.size());
-                result.integratedLufs =
-                    static_cast<float>(-0.691 + 10.0 * std::log10(mean));
-            }
-        }
-    }
+    result.integratedLufs = integratedLufsFromBlocks(intBlocks);
 
     // ── LRA (3 s blocks, -20 LU relative gate, P95 - P10) ────────────────────
-    {
-        std::vector<double> g1;
-        for (double z : lraBlocks)
-            if (z >= kAbsGateZ) g1.push_back(z);
-        if (g1.size() >= 2) {
-            double Jg = 0.0;
-            for (double z : g1) Jg += z;
-            Jg /= static_cast<double>(g1.size());
-            const double relGateZ = Jg * 0.01;  // -20 LU = power × 0.01
-            std::vector<float> lufsVals;
-            for (double z : g1) {
-                if (z >= relGateZ)
-                    lufsVals.push_back(
-                        static_cast<float>(-0.691 + 10.0 * std::log10(z)));
-            }
-            if (lufsVals.size() >= 2) {
-                std::sort(lufsVals.begin(), lufsVals.end());
-                const auto n = lufsVals.size();
-                auto idx = [n](float p) -> size_t {
-                    return static_cast<size_t>(
-                        std::clamp(static_cast<int>(
-                            std::floor(p * static_cast<float>(n))),
-                            0, static_cast<int>(n) - 1));
-                };
-                result.lra = std::max(0.f, lufsVals[idx(0.95f)] - lufsVals[idx(0.10f)]);
-            }
+    constexpr double kAbsGateZ = 1.1724e-7;
+    std::vector<double> g1;
+    for (double z : lraBlocks)
+        if (z >= kAbsGateZ) g1.push_back(z);
+
+    if (g1.size() >= 2) {
+        double Jg = 0.0;
+        for (double z : g1) Jg += z;
+        Jg /= static_cast<double>(g1.size());
+        const double relGateZ = Jg * 0.01;  // -20 LU = power × 0.01
+
+        std::vector<float> lufsVals;
+        for (double z : g1) {
+            if (z >= relGateZ)
+                lufsVals.push_back(static_cast<float>(-0.691 + 10.0 * std::log10(z)));
+        }
+
+        if (lufsVals.size() >= 2) {
+            std::sort(lufsVals.begin(), lufsVals.end());
+            const auto n = lufsVals.size();
+            // Nearest-rank percentile: ceil(p * n) - 1 (0-based index)
+            auto idx = [n](float p) -> size_t {
+                const size_t i = static_cast<size_t>(std::ceil(p * static_cast<float>(n)));
+                return (i > 0 ? i - 1 : 0);
+            };
+            result.lra = std::max(0.f, lufsVals[idx(0.95f)] - lufsVals[idx(0.10f)]);
         }
     }
 

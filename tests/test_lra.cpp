@@ -12,7 +12,7 @@ TEST_CASE("measureWithLra: silence returns floor values") {
     const int frames = static_cast<int>(10.f * 48000.f);
     std::vector<std::vector<float>> buf(2, std::vector<float>(static_cast<size_t>(frames), 0.f));
     const auto m = la.measureWithLra(buf, frames);
-    CHECK(m.integratedLufs <= -69.f);
+    CHECK(m.integratedLufs == doctest::Approx(-70.f));
     CHECK(m.lra == 0.f);
 }
 
@@ -30,6 +30,9 @@ TEST_CASE("measureWithLra: constant-level signal gives LRA near zero") {
     la.prepare(sr, 2);
     const auto m = la.measureWithLra(buf, frames);
     CHECK(m.lra < 1.f);
+    // A -20 dBFS sine (amplitude 0.1) should produce ~ -21 LUFS
+    CHECK(m.integratedLufs > -25.f);
+    CHECK(m.integratedLufs < -18.f);
 }
 
 TEST_CASE("measureWithLra: two-level signal gives LRA in expected range") {
@@ -55,6 +58,6 @@ TEST_CASE("measureWithLra: two-level signal gives LRA in expected range") {
     mt::dsp::LufsAnalyser la;
     la.prepare(sr, 2);
     const auto m = la.measureWithLra(buf, frames);
-    CHECK(m.lra > 15.f);
+    CHECK(m.lra > 17.f);
     CHECK(m.lra < 22.f);
 }
