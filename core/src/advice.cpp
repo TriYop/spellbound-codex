@@ -82,8 +82,11 @@ AdviceSet deriveAdvice(const AnalysisSnapshot& snap, const PresetData& preset) {
     out.saturator.driveDb = std::clamp(-crestDeficit * 0.4f, 0.f, 6.f);
 
     // ── Limiter target ────────────────────────────────────────────────────────
-    // Approximate LUFS from overallRmsDb (RMS dBFS ≈ LUFS − 3 dB heuristic)
-    out.limiter.targetLufsApprox = preset.overallRmsDb + 3.f;
+    // Approximate LUFS from overallRmsDb (RMS dBFS ≈ LUFS − 3 dB heuristic).
+    // LRA offset: neutral at 12 LU; low LRA (hyperlimited) pulls down by up to 3 LU;
+    // high LRA (orchestral/film) raises by up to 3 LU — preserves macro-dynamics.
+    out.limiter.targetLufsApprox = preset.overallRmsDb + 3.f
+        + std::clamp((snap.lraLu - 12.f) * 0.30f, -3.f, 3.f);
     out.limiter.ceilingDb        = -1.f;
 
     return out;

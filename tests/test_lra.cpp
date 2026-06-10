@@ -1,4 +1,7 @@
 #include "mastertweak/dsp/lufs_analyser.hpp"
+#include "mastertweak/advice.hpp"
+#include "mastertweak/analysis.hpp"
+#include "mastertweak/preset.hpp"
 #include <doctest.h>
 #include <cmath>
 #include <numbers>
@@ -60,4 +63,62 @@ TEST_CASE("measureWithLra: two-level signal gives LRA in expected range") {
     const auto m = la.measureWithLra(buf, frames);
     CHECK(m.lra > 17.f);
     CHECK(m.lra < 22.f);
+}
+
+// ── deriveAdvice() LRA offset ─────────────────────────────────────────────────
+
+static mt::PresetData makeLraTestPreset() {
+    mt::PresetData p;
+    p.name = "LRA Test";
+    for (size_t i = 0; i < 7; ++i) {
+        p.bandRmsDb[i]       = -20.f;
+        p.bandMinCorr[i]     =  0.6f;
+        p.bandTransientDb[i] = 10.f;
+    }
+    p.overallRmsDb   = -16.f;  // baseline targetLufsApprox = -16 + 3 = -13
+    p.overallMinCorr =  0.6f;
+    return p;
+}
+
+static mt::AnalysisSnapshot makeSnapWithLra(const mt::PresetData& preset, float lra) {
+    mt::AnalysisSnapshot snap;
+    for (size_t i = 0; i < 7; ++i) {
+        snap.bands[i].avgRmsDb    = preset.bandRmsDb[i];
+        snap.bands[i].p50RmsDb    = preset.bandRmsDb[i];
+        snap.bands[i].p95RmsDb    = preset.bandRmsDb[i];
+        snap.bands[i].correlation = preset.bandMinCorr[i];
+        snap.bands[i].crestDb     = preset.bandTransientDb[i];
+    }
+    snap.overallAvgDb  = preset.overallRmsDb;
+    snap.overallPeakDb = preset.overallRmsDb;
+    snap.overallCorr   = preset.overallMinCorr;
+    snap.lraLu         = lra;
+    return snap;
+}
+
+TEST_CASE("deriveAdvice: low LRA (2 LU) lowers targetLufsApprox by 3 LU") {
+    const auto preset = makeLraTestPreset();
+    const auto snap   = makeSnapWithLra(preset, 2.f);
+    // offset = clamp((2 - 12) * 0.30, -3, 3) = -3
+    // targetLufsApprox = -13 + (-3) = -16
+    const auto advice = mt::deriveAdvice(snap, preset);
+    CHECK(advice.limiter.targetLufsApprox == doctest::Approx(-16.f));
+}
+
+TEST_CASE("deriveAdvice: neutral LRA (12 LU) leaves targetLufsApprox unchanged") {
+    const auto preset = makeLraTestPreset();
+    const auto snap   = makeSnapWithLra(preset, 12.f);
+    // offset = clamp(0, -3, 3) = 0
+    // targetLufsApprox = -13
+    const auto advice = mt::deriveAdvice(snap, preset);
+    CHECK(advice.limiter.targetLufsApprox == doctest::Approx(-13.f));
+}
+
+TEST_CASE("deriveAdvice: high LRA (22 LU) raises targetLufsApprox by 3 LU") {
+    const auto preset = makeLraTestPreset();
+    const auto snap   = makeSnapWithLra(preset, 22.f);
+    // offset = clamp((22 - 12) * 0.30, -3, 3) = 3
+    // targetLufsApprox = -13 + 3 = -10
+    const auto advice = mt::deriveAdvice(snap, preset);
+    CHECK(advice.limiter.targetLufsApprox == doctest::Approx(-10.f));
 }
