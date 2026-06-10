@@ -312,23 +312,25 @@ void ChainPanel::buildUi() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void ChainPanel::applyToControls(const mt::AdviceSet& adv) {
-    for (int i = 0; i < kNumBands; ++i) {
-        const auto si = static_cast<size_t>(i);
-        const double v = static_cast<double>(adv.eq[si].gainDb);
-        eqGainFaders_[i]->blockSignals(true);
-        eqGainFaders_[i]->setValue(v);
-        eqGainFaders_[i]->setClean(eqGainFaders_[i]->value());  // post-clamp
-        eqGainFaders_[i]->blockSignals(false);
-    }
     auto setCtrl = [](AudioControl* c, double v) {
         c->blockSignals(true);
         c->setValue(v);
-        c->setClean(c->value());  // use post-clamp value to avoid spurious dirty dot
+        c->setClean(c->value());
         c->blockSignals(false);
     };
+
+    for (int i = 0; i < kNumBands; ++i) {
+        const auto si = static_cast<size_t>(i);
+        setCtrl(eqGainFaders_[i],   static_cast<double>(adv.eq[si].gainDb));
+        setCtrl(mbThreshFaders_[i], static_cast<double>(adv.mbComp[si].thresholdDb));
+        setCtrl(mbRatioKnobs_[i],   static_cast<double>(adv.mbComp[si].ratio));
+        setCtrl(widthFaders_[i],    static_cast<double>(adv.width[si].width));
+    }
     setCtrl(satDriveKnob_,     static_cast<double>(adv.saturator.driveDb));
     setCtrl(mixbusThreshKnob_, static_cast<double>(adv.mixbusComp.thresholdDb));
+    setCtrl(mixbusRatioKnob_,  static_cast<double>(adv.mixbusComp.ratio));
     setCtrl(mixbusMakeupKnob_, static_cast<double>(adv.mixbusComp.makeupDb));
+    setCtrl(limTargetKnob_,    static_cast<double>(adv.limiter.targetLufsApprox));
     setCtrl(limCeilingFader_,  static_cast<double>(adv.limiter.ceilingDb));
 }
 
@@ -350,9 +352,9 @@ void ChainPanel::setAdvice(const mt::AdviceSet& advice,
     {
         const int nRes = static_cast<int>(advice.resonances.size());
         resNoResLabel_->setVisible(nRes == 0);
-        resBox_->blockSignals(true);
-        resBox_->setChecked(nRes > 0);
-        resBox_->blockSignals(false);
+        resUnit_->blockSignals(true);
+        resUnit_->setBypassed(nRes == 0);
+        resUnit_->blockSignals(false);
 
         for (int i = 0; i < kMaxResonances; ++i) {
             if (i < nRes) {
@@ -372,9 +374,21 @@ void ChainPanel::setAdvice(const mt::AdviceSet& advice,
                 resRowChecks_[i]->setVisible(false);
             }
         }
+
+        if (nRes > 0) {
+            const auto& p0 = advice.resonances[0];
+            resUnit_->setStats(
+                QString("%1 peak(s) · top %2 dB @ %3 Hz")
+                    .arg(nRes)
+                    .arg(static_cast<double>(p0.gainDb), 0, 'f', 1)
+                    .arg(static_cast<int>(p0.freqHz)));
+        } else {
+            resUnit_->setStats("No resonances detected");
+        }
+        resUnit_->setBadge("advised");
     }
 
-    // EQ per-band readouts: "preset target → measured RMS"
+    // ── EQ readouts ───────────────────────────────────────────────────────────
     for (int i = 0; i < kNumBands; ++i) {
         const auto si = static_cast<size_t>(i);
         eqReadouts_[i]->setText(
@@ -382,81 +396,125 @@ void ChainPanel::setAdvice(const mt::AdviceSet& advice,
                 .arg(static_cast<int>(std::round(preset.bandRmsDb[si])))
                 .arg(static_cast<int>(std::round(snap.bands[si].avgRmsDb))));
     }
+    eqUnit_->setStats(
+        QString("Sub %1  Lows %2  Lo-Mid %3  Mids %4  Hi-Mid %5  Highs %6  Air %7 dB")
+            .arg(static_cast<double>(advice.eq[0].gainDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.eq[1].gainDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.eq[2].gainDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.eq[3].gainDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.eq[4].gainDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.eq[5].gainDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.eq[6].gainDb), 0, 'f', 1));
+    eqUnit_->setBadge("advised");
 
+    // ── Multiband Comp stats ──────────────────────────────────────────────────
     float crestSum = 0.f;
     for (int i = 0; i < kNumBands; ++i)
         crestSum += snap.bands[static_cast<size_t>(i)].crestDb;
     const float avgCrest = crestSum / static_cast<float>(kNumBands);
 
-    mbCrestLbl_->setText(
-        QString("Crest: %1 dB").arg(static_cast<double>(avgCrest), 0, 'f', 1));
-    satCrestLbl_->setText(
-        QString("Crest: %1 dB").arg(static_cast<double>(avgCrest), 0, 'f', 1));
-    widthCorrLbl_->setText(
-        QString("Corr: %1").arg(static_cast<double>(snap.overallCorr), 0, 'f', 2));
-    mixbusRmsLbl_->setText(
-        QString("rms: %1 dBFS").arg(static_cast<double>(snap.overallAvgDb), 0, 'f', 1));
-    limPeakLbl_->setText(
-        QString("peak: %1 dBFS").arg(static_cast<double>(snap.overallPeakDb), 0, 'f', 1));
-    limLraLbl_->setText(
-        QString("LRA: %1 LU").arg(static_cast<double>(snap.lraLu), 0, 'f', 1));
+    mbUnit_->setStats(
+        QString("Sub %1/%2:1  Mids %3/%4:1  Air %5/%6:1 · crest %7 dB")
+            .arg(static_cast<double>(advice.mbComp[0].thresholdDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.mbComp[0].ratio),       0, 'f', 1)
+            .arg(static_cast<double>(advice.mbComp[3].thresholdDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.mbComp[3].ratio),       0, 'f', 1)
+            .arg(static_cast<double>(advice.mbComp[6].thresholdDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.mbComp[6].ratio),       0, 'f', 1)
+            .arg(static_cast<double>(avgCrest), 0, 'f', 1));
+    mbUnit_->setBadge("advised");
+
+    // ── Saturator stats ───────────────────────────────────────────────────────
+    satUnit_->setStats(
+        QString("drive %1 dB · crest %2 dB")
+            .arg(static_cast<double>(advice.saturator.driveDb), 0, 'f', 1)
+            .arg(static_cast<double>(avgCrest), 0, 'f', 1));
+    satUnit_->setBadge("advised");
+
+    // ── Stereo Width stats ────────────────────────────────────────────────────
+    widthUnit_->setStats(
+        QString("corr %1 · Lows %2\xc3\x97  Mids %3\xc3\x97  Highs %4\xc3\x97")
+            .arg(static_cast<double>(snap.overallCorr),        0, 'f', 2)
+            .arg(static_cast<double>(advice.width[1].width),   0, 'f', 2)
+            .arg(static_cast<double>(advice.width[3].width),   0, 'f', 2)
+            .arg(static_cast<double>(advice.width[5].width),   0, 'f', 2));
+    widthUnit_->setBadge("advised");
+
+    // ── Mixbus Comp stats ─────────────────────────────────────────────────────
+    mixbusUnit_->setStats(
+        QString("%1 dB / %2:1 / %3 mkup · rms %4 dBFS")
+            .arg(static_cast<double>(advice.mixbusComp.thresholdDb), 0, 'f', 1)
+            .arg(static_cast<double>(advice.mixbusComp.ratio),       0, 'f', 1)
+            .arg(static_cast<double>(advice.mixbusComp.makeupDb),    0, 'f', 1)
+            .arg(static_cast<double>(snap.overallAvgDb),             0, 'f', 1));
+    mixbusUnit_->setBadge("advised");
+
+    // ── Limiter stats ─────────────────────────────────────────────────────────
+    limUnit_->setStats(
+        QString("%1 LUFS · ceil %2 dBTP · peak %3 dBFS · LRA %4 LU")
+            .arg(static_cast<double>(advice.limiter.targetLufsApprox), 0, 'f', 1)
+            .arg(static_cast<double>(advice.limiter.ceilingDb),        0, 'f', 1)
+            .arg(static_cast<double>(snap.overallPeakDb),              0, 'f', 1)
+            .arg(static_cast<double>(snap.lraLu),                      0, 'f', 1));
+    limUnit_->setBadge("advised");
 }
 
 mt::AdviceSet ChainPanel::currentAdvice() const {
     mt::AdviceSet adv = autoAdvice_;
     for (int i = 0; i < kNumBands; ++i) {
         const auto si = static_cast<size_t>(i);
-        adv.eq[si].gainDb = static_cast<float>(eqGainFaders_[i]->value());
+        adv.eq[si].gainDb          = static_cast<float>(eqGainFaders_[i]->value());
+        adv.mbComp[si].thresholdDb = static_cast<float>(mbThreshFaders_[i]->value());
+        adv.mbComp[si].ratio       = static_cast<float>(mbRatioKnobs_[i]->value());
+        adv.width[si].width        = static_cast<float>(widthFaders_[i]->value());
     }
-    adv.limiter.ceilingDb      = static_cast<float>(limCeilingFader_->value());
-    adv.saturator.driveDb      = static_cast<float>(satDriveKnob_->value());
-    adv.mixbusComp.thresholdDb = static_cast<float>(mixbusThreshKnob_->value());
-    adv.mixbusComp.makeupDb    = static_cast<float>(mixbusMakeupKnob_->value());
+    adv.saturator.driveDb        = static_cast<float>(satDriveKnob_->value());
+    adv.mixbusComp.thresholdDb   = static_cast<float>(mixbusThreshKnob_->value());
+    adv.mixbusComp.ratio         = static_cast<float>(mixbusRatioKnob_->value());
+    adv.mixbusComp.makeupDb      = static_cast<float>(mixbusMakeupKnob_->value());
+    adv.limiter.targetLufsApprox = static_cast<float>(limTargetKnob_->value());
+    adv.limiter.ceilingDb        = static_cast<float>(limCeilingFader_->value());
     for (int i = 0; i < static_cast<int>(adv.resonances.size()); ++i)
         adv.resonances[static_cast<size_t>(i)].enabled = resRowChecks_[i]->isChecked();
     return adv;
 }
 
 void ChainPanel::populateBypassFlags(mt::RenderOptions& opts) const {
-    if (resBox_) opts.bypassResonanceEq = !resBox_->isChecked();
-    opts.bypassEq         = !eqBox_->isChecked();
-    opts.bypassMbComp     = !mbBox_->isChecked();
-    opts.bypassSaturator  = !satBox_->isChecked();
-    opts.bypassWidth      = !widthBox_->isChecked();
-    opts.bypassMixbusComp = !mixbusBox_->isChecked();
-    opts.bypassLimiter    = !limBox_->isChecked();
-    // bypassDither not exposed in UI; stays false (default)
+    opts.bypassResonanceEq = resUnit_->isBypassed();
+    opts.bypassEq          = eqUnit_->isBypassed();
+    opts.bypassMbComp      = mbUnit_->isBypassed();
+    opts.bypassSaturator   = satUnit_->isBypassed();
+    opts.bypassWidth       = widthUnit_->isBypassed();
+    opts.bypassMixbusComp  = mixbusUnit_->isBypassed();
+    opts.bypassLimiter     = limUnit_->isBypassed();
 }
 
 void ChainPanel::resetToAdvice() {
     if (!hasAdvice_) return;
     applyToControls(autoAdvice_);
 
-    for (QGroupBox* box : {eqBox_, mbBox_, widthBox_, satBox_, mixbusBox_, limBox_}) {
-        box->blockSignals(true);
-        box->setChecked(true);
-        box->blockSignals(false);
+    for (RackUnit* u : {eqUnit_, mbUnit_, satUnit_, widthUnit_, mixbusUnit_, limUnit_}) {
+        u->blockSignals(true);
+        u->setBypassed(false);
+        u->blockSignals(false);
     }
 
-    // Re-populate resonance section from autoAdvice_
-    {
-        const int nRes = static_cast<int>(autoAdvice_.resonances.size());
-        resNoResLabel_->setVisible(nRes == 0);
-        resBox_->blockSignals(true);
-        resBox_->setChecked(nRes > 0);
-        resBox_->blockSignals(false);
+    const int nRes = static_cast<int>(autoAdvice_.resonances.size());
+    resNoResLabel_->setVisible(nRes == 0);
+    resUnit_->blockSignals(true);
+    resUnit_->setBypassed(nRes == 0);
+    resUnit_->blockSignals(false);
 
-        for (int i = 0; i < kMaxResonances; ++i) {
-            if (i < nRes) {
-                resRowChecks_[i]->blockSignals(true);
-                resRowChecks_[i]->setChecked(autoAdvice_.resonances[static_cast<size_t>(i)].enabled);
-                resRowChecks_[i]->blockSignals(false);
-                resRowLabels_[i]->setVisible(true);
-                resRowChecks_[i]->setVisible(true);
-            } else {
-                resRowLabels_[i]->setVisible(false);
-                resRowChecks_[i]->setVisible(false);
-            }
+    for (int i = 0; i < kMaxResonances; ++i) {
+        if (i < nRes) {
+            resRowChecks_[i]->blockSignals(true);
+            resRowChecks_[i]->setChecked(autoAdvice_.resonances[static_cast<size_t>(i)].enabled);
+            resRowChecks_[i]->blockSignals(false);
+            resRowLabels_[i]->setVisible(true);
+            resRowChecks_[i]->setVisible(true);
+        } else {
+            resRowLabels_[i]->setVisible(false);
+            resRowChecks_[i]->setVisible(false);
         }
     }
 }
@@ -465,18 +523,19 @@ void ChainPanel::clear() {
     hasAdvice_  = false;
     autoAdvice_ = mt::AdviceSet{};
 
-    applyToControls(autoAdvice_);  // resets to defaults, clears dirty dots
+    applyToControls(autoAdvice_);
 
-    for (QGroupBox* box : {eqBox_, mbBox_, widthBox_, satBox_, mixbusBox_, limBox_}) {
-        box->blockSignals(true);
-        box->setChecked(true);
-        box->blockSignals(false);
+    for (RackUnit* u : {resUnit_, eqUnit_, mbUnit_, satUnit_, widthUnit_, mixbusUnit_, limUnit_}) {
+        u->blockSignals(true);
+        u->setBypassed(false);
+        u->blockSignals(false);
+        u->setStats(QString::fromUtf8("\xe2\x80\x94"));
+        u->setBadge(QString{});
     }
+    resUnit_->blockSignals(true);
+    resUnit_->setBypassed(true);   // no analysis → resonance unit is always inactive after clear
+    resUnit_->blockSignals(false);
 
-    // Reset resonance section
-    resBox_->blockSignals(true);
-    resBox_->setChecked(false);
-    resBox_->blockSignals(false);
     resNoResLabel_->setVisible(true);
     for (int i = 0; i < kMaxResonances; ++i) {
         resRowLabels_[i]->setVisible(false);
@@ -486,18 +545,17 @@ void ChainPanel::clear() {
     const QString dash = QString::fromUtf8("\xe2\x80\x94");
     for (int i = 0; i < kNumBands; ++i)
         eqReadouts_[i]->setText(dash);
-    mbCrestLbl_->setText(dash);
-    widthCorrLbl_->setText(dash);
-    satCrestLbl_->setText(dash);
-    mixbusRmsLbl_->setText(dash);
-    limPeakLbl_->setText(dash);
-    limLraLbl_->setText(dash);
 }
 
-VerticalFader* ChainPanel::eqGainFader(int band)  const { return eqGainFaders_[band]; }
-RotaryKnob*    ChainPanel::satDriveKnob()          const { return satDriveKnob_; }
-RotaryKnob*    ChainPanel::mixbusThreshKnob()      const { return mixbusThreshKnob_; }
-RotaryKnob*    ChainPanel::mixbusMakeupKnob()      const { return mixbusMakeupKnob_; }
-VerticalFader* ChainPanel::limCeilingFader()       const { return limCeilingFader_; }
+VerticalFader* ChainPanel::eqGainFader(int band)   const { return eqGainFaders_[band]; }
+RotaryKnob*    ChainPanel::satDriveKnob()           const { return satDriveKnob_; }
+RotaryKnob*    ChainPanel::mixbusThreshKnob()       const { return mixbusThreshKnob_; }
+RotaryKnob*    ChainPanel::mixbusMakeupKnob()       const { return mixbusMakeupKnob_; }
+VerticalFader* ChainPanel::limCeilingFader()        const { return limCeilingFader_; }
+RotaryKnob*    ChainPanel::mbRatioKnob(int band)    const { return mbRatioKnobs_[band]; }
+VerticalFader* ChainPanel::mbThreshFader(int band)  const { return mbThreshFaders_[band]; }
+VerticalFader* ChainPanel::widthFader(int band)     const { return widthFaders_[band]; }
+RotaryKnob*    ChainPanel::limTargetKnob()          const { return limTargetKnob_; }
+RotaryKnob*    ChainPanel::mixbusRatioKnob()        const { return mixbusRatioKnob_; }
 
 } // namespace gui
