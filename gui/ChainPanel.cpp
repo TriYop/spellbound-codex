@@ -249,6 +249,10 @@ void ChainPanel::buildUi() {
         limPeakLbl_->setStyleSheet("color: #555;");
         vbox->addWidget(limPeakLbl_);
 
+        limLraLbl_ = new QLabel(QString::fromUtf8("\xe2\x80\x94"), limBox_);
+        limLraLbl_->setStyleSheet("color: #555;");
+        vbox->addWidget(limLraLbl_);
+
         connect(limCeilingFader_, &AudioControl::valueChanged,
                 this, [this](double) { emitOverride(); });
         connect(limBox_, &QGroupBox::toggled, this, [this](bool) { emitOverride(); });
@@ -347,6 +351,8 @@ void ChainPanel::setAdvice(const mt::AdviceSet& advice,
         QString("rms: %1 dBFS").arg(static_cast<double>(snap.overallAvgDb), 0, 'f', 1));
     limPeakLbl_->setText(
         QString("peak: %1 dBFS").arg(static_cast<double>(snap.overallPeakDb), 0, 'f', 1));
+    limLraLbl_->setText(
+        QString("LRA: %1 LU").arg(static_cast<double>(snap.lraLu), 0, 'f', 1));
 }
 
 mt::AdviceSet ChainPanel::currentAdvice() const {
@@ -438,6 +444,7 @@ void ChainPanel::clear() {
     satCrestLbl_->setText(dash);
     mixbusRmsLbl_->setText(dash);
     limPeakLbl_->setText(dash);
+    limLraLbl_->setText(dash);
 }
 
 VerticalFader* ChainPanel::eqGainFader(int band)  const { return eqGainFaders_[band]; }

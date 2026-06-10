@@ -101,6 +101,7 @@ private:
     QGroupBox*     limBox_          = nullptr;
     VerticalFader* limCeilingFader_ = nullptr;
     QLabel*        limPeakLbl_      = nullptr;
+    QLabel*        limLraLbl_       = nullptr;
 };
 
 } // namespace gui
