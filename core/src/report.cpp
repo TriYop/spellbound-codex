@@ -70,7 +70,8 @@ std::string formatAdviceMarkdown(
            << " | " << std::setw(8)  << fmtF(b.correlation, 2) << " |\n";
     }
     md << "\n**Overall:** RMS " << fmtDb(snap.overallAvgDb)
-       << " dBFS · Correlation " << fmtF(snap.overallCorr, 2) << "\n\n";
+       << " dBFS · Correlation " << fmtF(snap.overallCorr, 2)
+       << "  \n**LRA:** " << fmtF(snap.lraLu, 1) << " LU\n\n";
 
     // ── Resonance EQ ─────────────────────────────────────────────────────────
     md << "## Resonance EQ\n\n";
