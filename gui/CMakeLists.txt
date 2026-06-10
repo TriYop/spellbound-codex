@@ -9,6 +9,8 @@ qt_add_executable(MasterTweak
     RotaryKnob.cpp
     VerticalFader.h
     VerticalFader.cpp
+    RackUnit.h
+    RackUnit.cpp
     ChainPanel.h
     ChainPanel.cpp
     PresetSelector.h
