@@ -1,0 +1,139 @@
+\documentclass[11pt, a4paper, twoside]{article}
+
+% Encoding and Language Support
+\usepackage[utf-8]{inputenc}
+\usepackage[english, french]{babel}
+
+% Page Layout
+\usepackage[left=1.5cm, right=1.5cm, top=2cm, bottom=2cm]{geometry}
+
+% Header and Footer
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{MasterTweak Documentation}
+\rhead{v1.0 — 2026-06-14}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Colors
+\usepackage{xcolor}
+\definecolor{accentColor}{RGB}{42,157,143}
+\definecolor{bgColor}{RGB}{245,245,245}
+
+% Boxes and Frames
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+
+% Define custom box styles
+\newtcolorbox{tipBox}{
+  colback=accentColor!10,
+  colframe=accentColor,
+  boxrule=1pt,
+  arc=2pt,
+  left=5pt,
+  right=5pt,
+  top=5pt,
+  bottom=5pt,
+  title=\textbf{Tip}
+}
+
+\newtcolorbox{warningBox}{
+  colback=orange!10,
+  colframe=orange,
+  boxrule=1pt,
+  arc=2pt,
+  left=5pt,
+  right=5pt,
+  top=5pt,
+  bottom=5pt,
+  title=\textbf{Warning}
+}
+
+% Links and References
+\usepackage[colorlinks, linkcolor=accentColor, urlcolor=accentColor]{hyperref}
+
+% Graphics and Floats
+\usepackage{graphicx}
+\usepackage{float}
+
+% Section Styling with Colors and Underlines
+\usepackage{titlesec}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{accentColor}}
+  {\thesection}{1em}{}
+  [{\titlerule[1pt]}]
+
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{accentColor!80}}
+  {\thesubsection}{1em}{}
+
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries\color{accentColor!60}}
+  {\thesubsubsection}{1em}{}
+
+% Code Block Styling
+\usepackage{listings}
+\lstset{
+  backgroundcolor=\color{bgColor},
+  basicstyle=\ttfamily\small,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\color{gray},
+  escapeinside={\%*}{*)},
+  extendedchars=true,
+  frame=single,
+  keepspaces=true,
+  keywordstyle=\color{accentColor},
+  language=C++,
+  numbers=left,
+  numbersep=5pt,
+  numberstyle=\tiny\color{gray},
+  rulecolor=\color{black},
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  stringstyle=\color{brown},
+  tabsize=2
+}
+
+% Image Caption Styling
+\usepackage[labelfont={bf,color=accentColor}]{caption}
+
+% ---
+% DOCUMENT START
+% ---
+
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+
+  {\Large\bfseries\color{accentColor} $title}
+
+  \vspace{1cm}
+
+  {\normalsize $author}
+
+  \vspace{0.5cm}
+
+  {\small June 2026}
+
+  \vfill
+\end{titlepage}
+
+% Table of Contents (if needed)
+$if(toc)$
+\newpage
+\tableofcontents
+\newpage
+$endif$
+
+% Main Content
+$body$
+
+\end{document}
