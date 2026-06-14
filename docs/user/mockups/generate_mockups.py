@@ -312,6 +312,90 @@ def generate_preset_builder_tabs():
     img.save(os.path.join(IMG_DIR, "mock_pb_manage.png"))
     print("✓ mock_pb_manage.png")
 
+def generate_chain_full():
+    """Generate complete DSP chain mockup showing all RackUnits stacked."""
+    width = 900
+    height = 950
+    img = Image.new('RGB', (width, height), BG_COLOR)
+    draw = ImageDraw.Draw(img)
+
+    y = 20
+
+    # Title
+    draw.text((20, y), "Complete DSP Chain", fill=ACCENT_COLOR, font=None)
+    draw.line([(20, y + 25), (width - 20, y + 25)], fill=BORDER_COLOR, width=1)
+    y += 50
+
+    # Resonance EQ
+    draw.text((20, y), "1. Resonance EQ", fill=ACCENT_COLOR, font=None)
+    draw.text((40, y + 25), "Detected resonances: ☑ 120 Hz (Q=8.5)  ☑ 2.4 kHz", fill=TEXT_COLOR, font=None)
+    y += 80
+
+    # Parametric EQ
+    draw.text((20, y), "2. Parametric EQ (7-Band)", fill=ACCENT_COLOR, font=None)
+    y += 25
+    labels = ["Sub", "Lows", "LowMid", "Mids", "HiMid", "Highs", "Air"]
+    x_positions = [50, 140, 230, 320, 410, 500, 590]
+    for i, (label, xpos) in enumerate(zip(labels, x_positions)):
+        draw.ellipse([(xpos - 15, y - 15), (xpos + 15, y + 15)], outline=ACCENT_COLOR, width=1)
+        draw.text((xpos - 10, y - 5), label[0], fill=TEXT_COLOR, font=None)
+        draw.text((xpos - 15, y + 20), f"+2dB", fill=LABEL_COLOR, font=None)
+    y += 70
+
+    # Multiband Compressor
+    draw.text((20, y), "3. Multiband Compressor", fill=ACCENT_COLOR, font=None)
+    y += 25
+    draw.text((20, y), "Band", fill=TEXT_COLOR, font=None)
+    draw.text((100, y), "Threshold", fill=TEXT_COLOR, font=None)
+    draw.text((250, y), "Ratio", fill=TEXT_COLOR, font=None)
+    y += 25
+    for label in ["Sub", "Lows", "LowMid"]:
+        draw.text((20, y), label, fill=TEXT_COLOR, font=None)
+        draw.text((100, y), "-18dB", fill=TEXT_COLOR, font=None)
+        draw.text((250, y), "3.2:1", fill=ACCENT_COLOR, font=None)
+        y += 20
+    y += 15
+
+    # Saturator
+    draw.text((20, y), "4. Saturator", fill=ACCENT_COLOR, font=None)
+    draw.text((20, y + 25), "Drive:", fill=TEXT_COLOR, font=None)
+    draw.ellipse([(130, y + 20), (180, y + 70)], outline=ACCENT_COLOR, width=1)
+    draw.line([(155, y + 25), (155, y + 35)], fill=ACCENT_COLOR, width=1)
+    draw.text((130 - 20, y + 55), "2.5 dB", fill=LABEL_COLOR, font=None)
+    y += 75
+
+    # Stereo Width
+    draw.text((20, y), "5. Stereo Width (per-band)", fill=ACCENT_COLOR, font=None)
+    y += 25
+    for label in ["Sub", "Lows", "LowMid"]:
+        draw.text((20, y), label, fill=TEXT_COLOR, font=None)
+        draw.rectangle([(110, y - 5), (125, y + 35)], outline=BORDER_COLOR, width=1, fill=(50, 50, 50))
+        draw.rectangle([(110, y + 10), (125, y + 20)], fill=ACCENT_COLOR)
+        y += 25
+    y += 10
+
+    # Mixbus Compressor
+    draw.text((20, y), "6. Mixbus Compressor", fill=ACCENT_COLOR, font=None)
+    y += 25
+    draw.text((20, y), "Threshold:", fill=TEXT_COLOR, font=None)
+    draw.ellipse([(150, y - 10), (185, y + 25)], outline=ACCENT_COLOR, width=1)
+    draw.line([(168, y - 5), (168, y + 5)], fill=ACCENT_COLOR, width=1)
+    draw.text((150 - 20, y + 30), "-20dB", fill=LABEL_COLOR, font=None)
+    draw.text((280, y), "Ratio:", fill=TEXT_COLOR, font=None)
+    draw.ellipse([(380, y - 10), (415, y + 25)], outline=ACCENT_COLOR, width=1)
+    draw.line([(398, y - 5), (398, y + 5)], fill=ACCENT_COLOR, width=1)
+    draw.text((380 - 20, y + 30), "4:1", fill=LABEL_COLOR, font=None)
+    y += 60
+
+    # Limiter
+    draw.text((20, y), "7. Limiter (True-Peak, 4× OS)", fill=ACCENT_COLOR, font=None)
+    y += 25
+    draw.text((20, y), "Target LUFS: -14.0", fill=TEXT_COLOR, font=None)
+    draw.text((300, y), "Ceiling: -1.0 dBTP", fill=TEXT_COLOR, font=None)
+
+    img.save(os.path.join(IMG_DIR, "mock_chain_full.png"))
+    print("✓ mock_chain_full.png")
+
 def generate_diagrams():
     """Generate reference diagrams."""
     width = 900
@@ -370,6 +454,7 @@ def main():
     try:
         generate_main_window()
         generate_rack_units()
+        generate_chain_full()
         generate_transport_and_dialogs()
         generate_preset_builder_tabs()
         generate_diagrams()
