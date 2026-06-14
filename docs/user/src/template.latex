@@ -1,7 +1,6 @@
 \documentclass[11pt, a4paper, twoside]{article}
 
-% Encoding and Language Support
-\usepackage[utf-8]{inputenc}
+% Encoding and Language Support (xetex doesn't need inputenc)
 \usepackage[english, french]{babel}
 
 % Page Layout
@@ -75,6 +74,13 @@
 
 % Code Block Styling
 \usepackage{listings}
+\usepackage{fancyvrb}
+\usepackage{framed}
+
+% Define Shaded environment for Pandoc code blocks
+\definecolor{shadecolor}{RGB}{245,245,245}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+
 \lstset{
   backgroundcolor=\color{bgColor},
   basicstyle=\ttfamily\small,
@@ -102,6 +108,10 @@
 % Image Caption Styling
 \usepackage[labelfont={bf,color=accentColor}]{caption}
 
+% Define tightlist for Pandoc compatibility
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
 % ---
 % DOCUMENT START
 % ---
@@ -113,11 +123,11 @@
   \centering
   \vspace*{2cm}
 
-  {\Large\bfseries\color{accentColor} $title}
+  {\Large\bfseries\color{accentColor} $title$}
 
   \vspace{1cm}
 
-  {\normalsize $author}
+  {\normalsize $author$}
 
   \vspace{0.5cm}
 

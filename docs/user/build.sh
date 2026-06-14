@@ -14,7 +14,6 @@ echo "=== Building PDFs ==="
 
 # Mastering guide (French)
 pandoc \
-  --template="$SRC_DIR/template.latex" \
   --pdf-engine=xelatex \
   --toc \
   --toc-depth=2 \
@@ -27,7 +26,6 @@ echo "✓ MasterTweak_Guide_Mastering_FR.pdf"
 
 # Preset builder guide (French)
 pandoc \
-  --template="$SRC_DIR/template.latex" \
   --pdf-engine=xelatex \
   --toc \
   --toc-depth=2 \
@@ -40,7 +38,6 @@ echo "✓ MasterTweak_Guide_PresetBuilder_FR.pdf"
 
 # Quick start (French)
 pandoc \
-  --template="$SRC_DIR/template.latex" \
   --pdf-engine=xelatex \
   -V title="MasterTweak — Démarrage Rapide" \
   -V author="MasterTweak Team" \
@@ -51,7 +48,6 @@ echo "✓ MasterTweak_QuickStart_FR.pdf"
 
 # Quick start (English)
 pandoc \
-  --template="$SRC_DIR/template.latex" \
   --pdf-engine=xelatex \
   -V title="MasterTweak — Quick Start" \
   -V author="MasterTweak Team" \
