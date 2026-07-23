@@ -4,6 +4,8 @@ Offline auto-mastering application for audio engineers. Analyses a track against
 
 Available as a command-line tool and a Qt6 desktop GUI. Both share the same `mastertweak_core` static library.
 
+![MasterTweak main window](docs/user/screenshots/mastertweak_main_window.png)
+
 ---
 
 ## Features
