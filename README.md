@@ -26,7 +26,7 @@ Available as a command-line tool and a Qt6 desktop GUI. Both share the same `mas
 
 ```bash
 sudo apt install cmake ninja-build build-essential git curl \
-    libsndfile1-dev qt6-base-dev libasound2-dev libtag1-dev
+    libsndfile1-dev qt6-base-dev libasound2-dev libtag1-dev libsqlite3-dev
 ```
 
 ### Build
@@ -46,8 +46,12 @@ cmake -B build -G Ninja -DMASTERTWEAK_BUILD_GUI=OFF
 
 ### Run
 
+No genre presets are bundled in this repo yet — build one with the GUI's Preset Builder
+(see below), or drop a MixAdvice-exported XML into `~/.config/MixAdvice/Presets/`, then
+reference it by name or pass the XML path directly via `--preset`:
+
 ```bash
-# Master a single file with a bundled preset
+# Master a single file with a preset
 ./build/cli/mastertweak track.wav --preset Rock
 
 # Analyse only — print advice without rendering
@@ -180,6 +184,15 @@ Presets are MixAdvice-compatible XML files encoding genre-specific targets:
 </preset>
 ```
 
+> **A preset describes a target sound, not a set of knob positions.** The numbers above
+> are reference measurements — typical band RMS, transient headroom, and stereo
+> correlation for tracks in that genre — not EQ gains, compressor thresholds, or any
+> other DSP parameter. At render time, `deriveAdvice()` compares these targets against
+> the *measured* analysis of your input track and derives every knob position from the
+> gap between the two (see [AdviceSet algorithm](CLAUDE.md) for the
+> exact formulas). The same preset therefore produces different EQ/compression settings
+> on different source material — that's the point.
+
 Preset search order: `<binary dir>/presets/` → `~/.config/MixAdvice/Presets/`.
 
 ---
@@ -200,12 +213,14 @@ The preset builder stores data in `~/.config/MasterTweak/preset_builder.db` (SQL
 ## Architecture
 
 ```
-mastertweak_core/          Pure C++20 static library. No Qt, no JUCE.
+core/                      mastertweak_core: pure C++20 static library. No Qt, no JUCE.
   include/mastertweak/
+    version.hpp            version() — MASTERTWEAK_VERSION_STRING accessor
     io.hpp                 libsndfile + miniaudio wrapper (read WAV/FLAC/AIFF/MP3/OGG)
     preset.hpp             PresetData + XML loader (pugixml, MixAdvice-compatible schema)
     analysis.hpp           SevenBandAnalyser + ResonancePeak + detectResonances()
     advice.hpp             AdviceSet + deriveAdvice() — pure function
+    codec_correction.hpp   FFT-based lossy-codec rolloff correction (computeCodecCorrection)
     pipeline.hpp           analyseOnly() / renderFile()
     report.hpp             formatAdviceMarkdown()
     target_level.hpp       TargetLevelProfile + built-in profiles
@@ -231,7 +246,8 @@ preset_builder/            Hexagonal domain (ports & adapters): Track, Preset,
                            IngestService, StatsService, SimilarityService, ExportService
 tests/                     doctest unit tests
 third_party/               pugixml, miniaudio, CLI11, doctest, picosha2, RtMidi
-presets/                   Bundled genre preset XMLs
+presets/                   Genre preset XMLs go here (empty by default — see Run/Preset
+                           System below); searched relative to the binary at runtime
 ```
 
 ---
