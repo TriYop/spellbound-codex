@@ -184,6 +184,15 @@ Presets are MixAdvice-compatible XML files encoding genre-specific targets:
 </preset>
 ```
 
+> **A preset describes a target sound, not a set of knob positions.** The numbers above
+> are reference measurements — typical band RMS, transient headroom, and stereo
+> correlation for tracks in that genre — not EQ gains, compressor thresholds, or any
+> other DSP parameter. At render time, `deriveAdvice()` compares these targets against
+> the *measured* analysis of your input track and derives every knob position from the
+> gap between the two (see [AdviceSet algorithm](CLAUDE.md) for the
+> exact formulas). The same preset therefore produces different EQ/compression settings
+> on different source material — that's the point.
+
 Preset search order: `<binary dir>/presets/` → `~/.config/MixAdvice/Presets/`.
 
 ---
