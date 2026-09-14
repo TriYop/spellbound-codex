@@ -31,6 +31,8 @@ target_include_directories(mastertweak_core PUBLIC
 target_link_libraries(mastertweak_core
     PUBLIC
         $<IF:$<BOOL:${MASTERTWEAK_STATIC}>,SndFile::sndfile,PkgConfig::SNDFILE>
+        AudioPluginsCommon::dsp
+        AudioPluginsCommon::analysis
     PRIVATE
         pugixml
 )
