@@ -127,3 +127,46 @@ TEST_CASE("percentile descriptors: P10 in quiet zone, P95 in loud zone, P10 < P5
     // At least 10 dB separates the two extremes
     CHECK(b.p10RmsDb < b.p95RmsDb - 10.f);
 }
+
+TEST_CASE("L and R crossover filter state is isolated: asymmetric per-channel content") {
+    // Every existing test above feeds identical L/R content (makeStereoSine duplicates
+    // the same signal into both channels) or mono input, so none of them would notice
+    // if analyseFile()'s L and R LinkwitzRileyCrossover filter instances accidentally
+    // shared state. Here L carries a 1 kHz tone (Mids band, index 3) and R carries a
+    // 100 Hz tone (Lows band, index 1) -- two uncorrelated, differently-banded signals.
+    const int   sr      = 44100;
+    const float durSec  = 2.f;
+    const int   numFrames = static_cast<int>(static_cast<float>(sr) * durSec);
+
+    mt::AudioFile f;
+    f.sampleRate  = sr;
+    f.numChannels = 2;
+    f.numFrames   = numFrames;
+    f.bitDepth    = 24;
+    f.samples.resize(2, std::vector<float>(static_cast<size_t>(numFrames)));
+    for (int i = 0; i < numFrames; ++i) {
+        const float t = static_cast<float>(i) / static_cast<float>(sr);
+        f.samples[0][static_cast<size_t>(i)] = 0.3f * std::sin(2.f * std::numbers::pi_v<float> * 1000.f * t);
+        f.samples[1][static_cast<size_t>(i)] = 0.3f * std::sin(2.f * std::numbers::pi_v<float> *  100.f * t);
+    }
+
+    const auto snap = mt::analyseFile(f);
+
+    // Both bands should show real energy (proves the crossover split still works per channel).
+    // avgRmsDb averages L/R *in dB*, so one silent channel pulls the value well below a
+    // full-strength (both-channels-loud) sine's ~-14 dBFS -- still far above true silence
+    // (~-100 dBFS), which is the point: real, asymmetric, per-channel signal.
+    CHECK(snap.bands[3].avgRmsDb > -50.f);  // Mids: L's 1 kHz tone
+    CHECK(snap.bands[1].avgRmsDb > -50.f);  // Lows: R's 100 Hz tone
+
+    // Unlike "equal L/R sine has correlation ≈ 1" above, these two bands each carry
+    // energy that is essentially confined to a single channel (1 kHz is absent from R,
+    // 100 Hz is absent from L), so L/R correlation must be low -- if the L and R filter
+    // instances shared internal state, cross-channel leakage would corrupt this band
+    // split and this correlation-based signature would no longer hold reliably.
+    CHECK(snap.bands[3].correlation < 0.5f);  // Mids: L-dominant, R near-silent there
+    CHECK(snap.bands[1].correlation < 0.5f);  // Lows: R-dominant, L near-silent there
+
+    // Sub band (0-80 Hz) should stay essentially silent for both the 1 kHz and 100 Hz tones.
+    CHECK(snap.bands[0].avgRmsDb < -40.f);
+}
