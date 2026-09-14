@@ -74,6 +74,11 @@ std::string formatAdviceMarkdown(
        << "  \n**LRA:** " << fmtF(snap.lraLu, 1) << " LU\n\n";
 
     // ── Resonance EQ ─────────────────────────────────────────────────────────
+    // NOTE: deliberately NOT delegated to AudioPluginsCommon::analysis::formatAdviceMarkdown
+    // during the Common migration. Common's ResonancePeak only carries {freqHz, q,
+    // prominenceDb} — no gainDb/enabled — so delegating would silently drop the Gain
+    // and Active columns rendered below. See docs/superpowers/plans/
+    // 2026-09-15-codex-common-analysis-migration.md Task 9 for the full reasoning.
     md << "## Resonance EQ\n\n";
     if (advice.resonances.empty()) {
         md << "_No resonances detected._\n\n";

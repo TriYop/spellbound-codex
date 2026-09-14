@@ -77,6 +77,9 @@ if(MASTERTWEAK_BUILD_TESTS)
 endif()
 
 include(FetchContent)
+# spellbound-common is a private GitHub repo: local builds need `git` already
+# configured with access (SSH key or credential helper); CI authenticates via
+# the COMMON_REPO_TOKEN secret (see .github/workflows/cmake-multi-platform.yml).
 FetchContent_Declare(AudioPluginsCommon
     GIT_REPOSITORY https://github.com/TriYop/spellbound-common.git
     GIT_TAG        v0.5.0
