@@ -4,6 +4,8 @@
 #include <string_view>
 #include <vector>
 
+#include "audioplugins/common/analysis/BandConfig.h"
+
 namespace mt {
 
 struct AudioFile;  // forward declare — analysis.hpp doesn't need io.hpp internals
@@ -19,21 +21,11 @@ struct BandStats {
 };
 
 struct AnalysisSnapshot {
-    static constexpr int kNumBands = 7;
-    static constexpr std::array<float, kNumBands - 1> kCrossoverHz = {
-        80.f, 250.f, 500.f, 2000.f, 6000.f, 16000.f
-    };
-    static constexpr std::array<const char*, kNumBands> kBandNames = {
-        "Sub", "Lows", "Lo-Mid", "Mids", "Hi-Mid", "Highs", "Air"
-    };
-    // true = this band should be advised as a shelf filter, not a bell
-    static constexpr std::array<bool, kNumBands> kBandIsShelf = {
-        true, false, false, false, false, false, true
-    };
-    // Representative EQ frequencies per band (matches MixAdvice BandConfig)
-    static constexpr std::array<float, kNumBands> kBandCenterHz = {
-        50.f, 160.f, 375.f, 1000.f, 3500.f, 10000.f, 16000.f
-    };
+    static constexpr int kNumBands = audioplugins::common::analysis::BandConfig::numBands;
+    static constexpr auto kCrossoverHz  = audioplugins::common::analysis::BandConfig::crossoverHz;
+    static constexpr auto kBandNames    = audioplugins::common::analysis::BandConfig::bandNames;
+    static constexpr auto kBandIsShelf  = audioplugins::common::analysis::BandConfig::bandIsShelf;
+    static constexpr auto kBandCenterHz = audioplugins::common::analysis::BandConfig::bandCenterHz;
 
     std::array<BandStats, kNumBands> bands{};
     float overallAvgDb  = -100.f;  // broadband L+R average long-term RMS
