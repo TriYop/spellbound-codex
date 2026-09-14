@@ -10,7 +10,6 @@ add_library(mastertweak_core STATIC
     src/report.cpp
     src/resonance_detector.cpp
     src/dsp/fft.cpp
-    src/dsp/linkwitz_riley.cpp
     src/dsp/parametric_eq.cpp
     src/dsp/compressor.cpp
     src/dsp/multiband_comp.cpp

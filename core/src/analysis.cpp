@@ -1,6 +1,6 @@
 #include "mastertweak/analysis.hpp"
 #include "mastertweak/io.hpp"
-#include "mastertweak/dsp/biquad.hpp"
+#include "audioplugins/common/dsp/LinkwitzRileyCrossover.h"
 #include "mastertweak/dsp/lufs_analyser.hpp"
 
 #include <algorithm>
@@ -17,27 +17,6 @@ namespace {
 constexpr int kNumBands      = AnalysisSnapshot::kNumBands;
 constexpr int kNumCrossovers = kNumBands - 1;
 constexpr int kBlockSize     = 1024;   // offline block size; matches typical plugin block
-constexpr float kQ707        = 0.7071067811865476f;  // 1/√2 — Butterworth Q
-
-// 4th-order Linkwitz-Riley crossover: two cascaded 2nd-order Butterworth stages.
-struct LR4 {
-    dsp::BiquadCoeffs c;
-    dsp::BiquadState  st[2][2] {};  // [stage][channel]
-
-    void setLowpass(float fc, float sr) noexcept {
-        c = dsp::BiquadCoeffs::lowpass(fc, kQ707, sr);
-        for (auto& stageArr : st) for (auto& s : stageArr) s.reset();
-    }
-    void setHighpass(float fc, float sr) noexcept {
-        c = dsp::BiquadCoeffs::highpass(fc, kQ707, sr);
-        for (auto& stageArr : st) for (auto& s : stageArr) s.reset();
-    }
-
-    float process(int ch, float x) noexcept {
-        return dsp::biquadProcess(c, st[1][static_cast<size_t>(ch)],
-               dsp::biquadProcess(c, st[0][static_cast<size_t>(ch)], x));
-    }
-};
 
 static float blockRmsLinear(const float* data, int n) noexcept {
     if (n <= 0) return 0.f;
@@ -84,12 +63,19 @@ AnalysisSnapshot analyseFile(const AudioFile& audio) {
     const float corrAlpha  = std::exp(-1.f / (0.30f * blocksPerSec));  // 300 ms
     const float crestAlpha = std::exp(-1.f / (0.50f * blocksPerSec));  // 500 ms
 
-    // Set up the LR4 cascaded crossover bank
-    std::array<LR4, kNumCrossovers> lpFilters, hpFilters;
+    // Set up the crossover bank (mono per filter: process() is called
+    // per-channel below with an explicit channel index, so numChannels=1
+    // here and each LR4-equivalent tracks 2 "channels" worth of state via
+    // separate L/R filter instances — matches the old LR4's [stage][channel]
+    // layout by using channel index 0 for L and a second array for R).
+    std::array<audioplugins::common::dsp::LinkwitzRileyCrossover, kNumCrossovers> lpFiltersL, lpFiltersR;
+    std::array<audioplugins::common::dsp::LinkwitzRileyCrossover, kNumCrossovers> hpFiltersL, hpFiltersR;
     for (int i = 0; i < kNumCrossovers; ++i) {
         const float fc = AnalysisSnapshot::kCrossoverHz[static_cast<size_t>(i)];
-        lpFilters[static_cast<size_t>(i)].setLowpass(fc, sr);
-        hpFilters[static_cast<size_t>(i)].setHighpass(fc, sr);
+        lpFiltersL[static_cast<size_t>(i)].setLowpass(fc, sr, 1);
+        lpFiltersR[static_cast<size_t>(i)].setLowpass(fc, sr, 1);
+        hpFiltersL[static_cast<size_t>(i)].setHighpass(fc, sr, 1);
+        hpFiltersR[static_cast<size_t>(i)].setHighpass(fc, sr, 1);
     }
 
     // Smoothed state (linear amplitude), peak-holds (linear amplitude)
@@ -185,13 +171,13 @@ AnalysisSnapshot analyseFile(const AudioFile& audio) {
             bandRmsSamples[bandIdx].push_back((toDb(rmsL) + toDb(rmsR)) * 0.5f);
         };
 
-        // Cascaded LR4 filterbank
+        // Cascaded crossover filterbank
         for (size_t ci = 0; ci < static_cast<size_t>(kNumCrossovers); ++ci) {
             for (int i = 0; i < n; ++i) {
-                band0[static_cast<size_t>(i)] = lpFilters[ci].process(0, remainder0[static_cast<size_t>(i)]);
-                band1[static_cast<size_t>(i)] = lpFilters[ci].process(1, remainder1[static_cast<size_t>(i)]);
-                remainder0[static_cast<size_t>(i)] = hpFilters[ci].process(0, remainder0[static_cast<size_t>(i)]);
-                remainder1[static_cast<size_t>(i)] = hpFilters[ci].process(1, remainder1[static_cast<size_t>(i)]);
+                band0[static_cast<size_t>(i)] = lpFiltersL[ci].processLowpass(0, remainder0[static_cast<size_t>(i)]);
+                band1[static_cast<size_t>(i)] = lpFiltersR[ci].processLowpass(0, remainder1[static_cast<size_t>(i)]);
+                remainder0[static_cast<size_t>(i)] = hpFiltersL[ci].processHighpass(0, remainder0[static_cast<size_t>(i)]);
+                remainder1[static_cast<size_t>(i)] = hpFiltersR[ci].processHighpass(0, remainder1[static_cast<size_t>(i)]);
             }
             storeBand(ci, band0.data(), band1.data());
         }
