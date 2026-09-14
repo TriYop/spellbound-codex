@@ -17,7 +17,6 @@ add_library(mastertweak_core STATIC
     src/dsp/stereo_width.cpp
     src/dsp/limiter.cpp
     src/dsp/dither.cpp
-    src/dsp/lufs_analyser.cpp
     src/dsp/gain_stager.cpp
     src/dsp/resonance_eq.cpp
 )
