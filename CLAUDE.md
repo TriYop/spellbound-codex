@@ -12,7 +12,7 @@ MasterTweak is a standalone **offline auto-mastering** application:
 - **Frontends:** Qt6 GUI + CLI, both driving the same `mastertweak_core` static lib.
 - **Preview:** post-render playback via miniaudio (re-render on parameter change).
 
-MasterTweak is **independent of MixAdvice as a codebase** — no shared code, no submodule, no JUCE. The only contract is MixAdvice's preset XML schema (`bandRmsDb[7]`, `bandMinCorr[7]`, `bandTransientDb[7]`, `overallRmsDb`, `overallMinCorr`, `name`, `description`). The 7-band layout (Sub, Lows, LowMids, Mids, HiMids, Highs, Air, crossovers at 80 / 250 / 500 / 2 k / 6 k / 16 k Hz) is reimplemented here from MixAdvice's `BandConfig.h`. The advice algorithm is reimplemented from `MixAdvice/Source/PluginEditor.cpp:537–665`.
+MasterTweak is **independent of MixAdvice as a codebase** — no shared code, no submodule, no JUCE. The only contract is MixAdvice's preset XML schema (`bandRmsDb[7]`, `bandMinCorr[7]`, `bandTransientDb[7]`, `overallRmsDb`, `overallMinCorr`, `name`, `description`). The 7-band layout (Sub, Lows, LowMids, Mids, HiMids, Highs, Air, crossovers at 80 / 250 / 500 / 2 k / 6 k / 16 k Hz) is reimplemented here from MixAdvice's `BandConfig.h`. The advice algorithm was originally reimplemented from the MixAdvice plugin repo (now named `TrueSight`, not `MixAdvice`, on disk) at `TrueSight/Source/PluginEditor.cpp` (`drawAdvicePanel`, currently lines 530–753) — note MasterTweak's `deriveAdvice()` has since intentionally diverged from that source (percentile-based reference levels, LRA-aware limiter targeting, resonance detection — see `core/src/advice.cpp`), so treat it as historical provenance, not a byte-for-byte port to keep in sync.
 
 ## Build Commands
 

@@ -1,6 +1,13 @@
 find_package(SQLite3 REQUIRED)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(TAGLIB REQUIRED taglib)
+
+if(MASTERTWEAK_STATIC)
+    # TagLib::tag provided by FetchContent in root CMakeLists.txt
+    set(_taglib_target TagLib::tag)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
+    set(_taglib_target PkgConfig::TAGLIB)
+endif()
 
 add_library(preset_builder_core STATIC
     src/services/stats_service.cpp
@@ -16,8 +23,6 @@ add_library(preset_builder_core STATIC
 target_include_directories(preset_builder_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-    PRIVATE
-        ${TAGLIB_INCLUDE_DIRS}
 )
 
 target_link_libraries(preset_builder_core
@@ -26,5 +31,5 @@ target_link_libraries(preset_builder_core
         SQLite::SQLite3
     PRIVATE
         picosha2
-        ${TAGLIB_LIBRARIES}
+        ${_taglib_target}
 )

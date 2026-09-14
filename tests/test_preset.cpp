@@ -94,12 +94,12 @@ TEST_CASE("loadPresetsFromDir: loads multiple XMLs from a directory") {
 
 TEST_CASE("loadPreset: loads a real MixAdvice preset if available") {
     const std::string path =
-        "/home/yvan/Projects/AudioPlugins/MixAdvice/Presets/metal-metallica.xml";
-    if (!fs::exists(path)) return;  // skip if MixAdvice not present
+        "/home/yvan/Projects/AudioPlugins/TrueSight/Presets/fest-noz.xml";
+    if (!fs::exists(path)) return;  // skip if TrueSight is not checked out alongside this repo
 
     std::string err;
     const auto p = mt::loadPreset(path, &err);
     REQUIRE_MESSAGE(p.has_value(), err);
-    CHECK(p->name == "Metal (Metallica)");
-    CHECK(p->overallRmsDb == doctest::Approx(-12.f));
+    CHECK(p->name == "Fest-Noz");
+    CHECK(p->overallRmsDb == doctest::Approx(-17.f));
 }
