@@ -51,6 +51,10 @@ jobs:
         sudo apt-get install -y libsndfile1-dev qt6-base-dev pkg-config libsqlite3-dev libasound2-dev
         sudo apt-get install -y libtag-dev || sudo apt-get install -y libtag1-dev
 
+    - name: Configure Common repo access
+      shell: bash
+      run: git config --global url."https://x-access-token:${{ secrets.COMMON_REPO_TOKEN }}@github.com/TriYop/spellbound-common".insteadOf "https://github.com/TriYop/spellbound-common"
+
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings

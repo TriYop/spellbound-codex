@@ -76,6 +76,14 @@ if(MASTERTWEAK_BUILD_TESTS)
     enable_testing()
 endif()
 
+include(FetchContent)
+FetchContent_Declare(AudioPluginsCommon
+    GIT_REPOSITORY https://github.com/TriYop/spellbound-common.git
+    GIT_TAG        v0.5.0
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(AudioPluginsCommon)
+
 add_subdirectory(third_party)
 add_subdirectory(core)
 add_subdirectory(preset_builder)
