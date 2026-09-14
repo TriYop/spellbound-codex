@@ -1,6 +1,6 @@
 #include "mastertweak/preset.hpp"
 
-#include <pugixml.hpp>
+#include "audioplugins/common/analysis/PresetIO.h"
 
 #include <algorithm>
 #include <cctype>
@@ -14,78 +14,31 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// Attribute names matching MixAdvice's XML schema band order
-static constexpr const char* kBandAttrNames[PresetData::kNumBands] = {
-    "sub", "lows", "lomid", "mids", "himid", "highs", "air"
-};
-
-bool parsePresetNode(const pugi::xml_node& root, PresetData& out, std::string* errOut) {
-    if (std::string_view{root.name()} != "MixAdvicePreset") {
-        if (errOut) *errOut = "Root element is not <MixAdvicePreset>";
-        return false;
-    }
-
-    out.name        = root.attribute("name").as_string();
-    out.description = root.attribute("description").as_string();
-
-    auto readBandArr = [&](const char* elem, std::array<float, PresetData::kNumBands>& arr) -> bool {
-        const pugi::xml_node node = root.child(elem);
-        if (!node) {
-            if (errOut) *errOut = std::string("Missing <") + elem + ">";
-            return false;
-        }
-        for (int i = 0; i < PresetData::kNumBands; ++i) {
-            const pugi::xml_attribute attr = node.attribute(kBandAttrNames[i]);
-            if (!attr) {
-                if (errOut) *errOut = std::string("Missing attribute '")
-                                    + kBandAttrNames[i] + "' in <" + elem + ">";
-                return false;
-            }
-            arr[static_cast<size_t>(i)] = attr.as_float();
-        }
-        return true;
-    };
-
-    if (!readBandArr("BandRmsDb",       out.bandRmsDb))       return false;
-    if (!readBandArr("BandMinCorr",     out.bandMinCorr))     return false;
-    if (!readBandArr("BandTransientDb", out.bandTransientDb)) return false;
-
-    const pugi::xml_node overall = root.child("Overall");
-    if (!overall) {
-        if (errOut) *errOut = "Missing <Overall>";
-        return false;
-    }
-    out.overallRmsDb   = overall.attribute("rmsDb").as_float(-18.f);
-    out.overallMinCorr = overall.attribute("minCorr").as_float(0.6f);
-
-    return true;
+PresetData toMtPresetData(const audioplugins::common::analysis::PresetData& src) {
+    PresetData out;
+    out.name            = src.name;
+    out.description      = src.description;
+    out.bandRmsDb        = src.bandRmsDb;
+    out.bandMinCorr      = src.bandMinCorr;
+    out.bandTransientDb  = src.bandTransientDb;
+    out.overallRmsDb     = src.overallRmsDb;
+    out.overallMinCorr   = src.overallMinCorr;
+    return out;
 }
 
 } // anonymous namespace
 
 std::optional<PresetData> loadPreset(const std::string& xmlPath, std::string* errOut) {
-    pugi::xml_document doc;
-    const pugi::xml_parse_result result = doc.load_file(xmlPath.c_str());
-    if (!result) {
-        if (errOut) *errOut = result.description();
-        return std::nullopt;
-    }
-
-    PresetData p;
-    if (!parsePresetNode(doc.first_child(), p, errOut))
-        return std::nullopt;
-    return p;
+    auto p = audioplugins::common::analysis::PresetIO::load(xmlPath, errOut);
+    if (!p) return std::nullopt;
+    return toMtPresetData(*p);
 }
 
 std::vector<PresetData> loadPresetsFromDir(const std::string& dirPath) {
+    const auto common = audioplugins::common::analysis::PresetIO::loadFromDirectory(dirPath);
     std::vector<PresetData> out;
-    std::error_code ec;
-    for (const auto& entry : fs::directory_iterator(dirPath, ec)) {
-        if (ec) break;
-        if (entry.path().extension() != ".xml") continue;
-        if (auto p = loadPreset(entry.path().string()))
-            out.push_back(std::move(*p));
-    }
+    out.reserve(common.size());
+    for (const auto& p : common) out.push_back(toMtPresetData(p));
     return out;
 }
 
