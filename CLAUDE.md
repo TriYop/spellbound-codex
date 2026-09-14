@@ -12,7 +12,7 @@ MasterTweak is a standalone **offline auto-mastering** application:
 - **Frontends:** Qt6 GUI + CLI, both driving the same `mastertweak_core` static lib.
 - **Preview:** post-render playback via miniaudio (re-render on parameter change).
 
-MasterTweak is **independent of MixAdvice as a codebase** — no shared code, no submodule, no JUCE. The only contract is MixAdvice's preset XML schema (`bandRmsDb[7]`, `bandMinCorr[7]`, `bandTransientDb[7]`, `overallRmsDb`, `overallMinCorr`, `name`, `description`). The 7-band layout (Sub, Lows, LowMids, Mids, HiMids, Highs, Air, crossovers at 80 / 250 / 500 / 2 k / 6 k / 16 k Hz) is reimplemented here from MixAdvice's `BandConfig.h`. The advice algorithm was originally reimplemented from the MixAdvice plugin repo (now named `TrueSight`, not `MixAdvice`, on disk) at `TrueSight/Source/PluginEditor.cpp` (`drawAdvicePanel`, currently lines 530–753) — note MasterTweak's `deriveAdvice()` has since intentionally diverged from that source (percentile-based reference levels, LRA-aware limiter targeting, resonance detection — see `core/src/advice.cpp`), so treat it as historical provenance, not a byte-for-byte port to keep in sync.
+MasterTweak's `core/` now consumes `AudioPlugins/Common`'s `common/dsp`/`common/analysis` modules (the same shared library TrueSight, MixAdvice's current name, also consumes or will consume) — this replaces what used to be independently-duplicated implementations of the band layout and advice algorithm. It's still **JUCE-free**, and `Common` is pulled in via CMake `FetchContent`, not a git submodule. The only remaining external contract is MixAdvice's preset XML schema (`bandRmsDb[7]`, `bandMinCorr[7]`, `bandTransientDb[7]`, `overallRmsDb`, `overallMinCorr`, `name`, `description`).
 
 ## Build Commands
 
@@ -62,7 +62,7 @@ cd build-release && cpack
 core/                     # static lib, pure C++20, no Qt, no JUCE
   include/mastertweak/
     io.hpp                # libsndfile wrapper: AudioFile, read/write WAV/FLAC/AIFF
-    preset.hpp            # PresetData + XML loader (pugixml) matching MixAdvice schema
+    preset.hpp            # PresetData + XML loader (via AudioPluginsCommon::analysis::PresetIO) matching MixAdvice schema
     analysis.hpp          # SevenBandAnalyser: LR cascade, per-band RMS/corr/crest
     advice.hpp            # AdviceSet + deriveAdvice(analysis, preset) → AdviceSet
     pipeline.hpp          # load → analyse → derive → render → save
@@ -81,7 +81,7 @@ core/                     # static lib, pure C++20, no Qt, no JUCE
 cli/                      # CLI (CLI11)
 gui/                      # Qt6 frontend
 tests/                    # doctest unit tests
-third_party/              # vendored single-header deps (pugixml 1.14, miniaudio 0.11.21,
+third_party/              # vendored single-header deps (miniaudio 0.11.21,
                           #  CLI11 v2.4.2, doctest v2.4.11)
 presets/                  # bundled MixAdvice preset XMLs (optional)
 ```
