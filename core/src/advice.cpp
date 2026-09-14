@@ -1,95 +1,64 @@
 #include "mastertweak/advice.hpp"
 
-#include <algorithm>
-#include <cmath>
+#include "audioplugins/common/analysis/AdviceSet.h"
 
 namespace mt {
 
-// Per-band release times (ms) — lower bands need longer release.
-// Matches the kRelMs[] array in MixAdvice/Source/PluginEditor.cpp:516.
-static constexpr float kRelMs[AdviceSet::kNumBands] = {
-    250.f, 160.f, 120.f, 100.f, 70.f, 50.f, 30.f
-};
+namespace {
+
+namespace ca = audioplugins::common::analysis;
+
+ca::AnalysisSnapshot toCommonSnapshot(const AnalysisSnapshot& snap) {
+    ca::AnalysisSnapshot out;
+    for (int i = 0; i < AnalysisSnapshot::kNumBands; ++i) {
+        const auto& b = snap.bands[static_cast<size_t>(i)];
+        out.bands[static_cast<size_t>(i)] = ca::BandStats{
+            b.avgRmsDb, b.peakRmsDb, b.p10RmsDb, b.p50RmsDb, b.p95RmsDb, b.correlation, b.crestDb
+        };
+    }
+    out.overallAvgDb  = snap.overallAvgDb;
+    out.overallPeakDb = snap.overallPeakDb;
+    out.overallCorr   = snap.overallCorr;
+    out.lraLu         = snap.lraLu;
+    return out;
+}
+
+ca::PresetData toCommonPreset(const PresetData& preset) {
+    ca::PresetData out;
+    out.name             = preset.name;
+    out.description       = preset.description;
+    out.bandRmsDb         = preset.bandRmsDb;
+    out.bandMinCorr       = preset.bandMinCorr;
+    out.bandTransientDb   = preset.bandTransientDb;
+    out.overallRmsDb      = preset.overallRmsDb;
+    out.overallMinCorr    = preset.overallMinCorr;
+    return out;
+}
+
+AdviceSet fromCommonAdvice(const ca::AdviceSet& advice) {
+    AdviceSet out;
+    for (int i = 0; i < AdviceSet::kNumBands; ++i) {
+        const auto is = static_cast<size_t>(i);
+        out.eq[is]     = { advice.eq[is].gainDb, advice.eq[is].q, advice.eq[is].isShelf, advice.eq[is].freqHz };
+        out.mbComp[is] = { advice.mbComp[is].thresholdDb, advice.mbComp[is].ratio,
+                            advice.mbComp[is].attackMs, advice.mbComp[is].releaseMs };
+        out.width[is]  = { advice.width[is].width };
+    }
+    out.mixbusComp = { advice.mixbusComp.thresholdDb, advice.mixbusComp.ratio,
+                        advice.mixbusComp.attackMs, advice.mixbusComp.releaseMs, advice.mixbusComp.makeupDb };
+    out.saturator  = { advice.saturator.driveDb };
+    out.limiter    = { advice.limiter.targetLufsApprox, advice.limiter.ceilingDb };
+    // advice.resonances is intentionally not copied -- Common's deriveAdvice()
+    // never populates it either (see AdviceSet.h), matching this file's
+    // existing behavior where resonances is set separately by pipeline.cpp.
+    return out;
+}
+
+} // namespace
 
 AdviceSet deriveAdvice(const AnalysisSnapshot& snap, const PresetData& preset) {
-    AdviceSet out;
-
-    // ── Per-band EQ + multiband compression ──────────────────────────────────
-    // "Characteristic level" = blend of median (P50) and 95th-percentile (P95) of
-    // per-block RMS — more robust than avg/peak on dynamic tracks.
-    // Intentionally diverges from MixAdvice/PluginEditor.cpp:532-534 (which uses
-    // avgRms + peakHold) to use the distribution-aware percentile blend instead.
-    for (int i = 0; i < AdviceSet::kNumBands; ++i) {
-        const auto bi = static_cast<size_t>(i);
-        const float refDb = (snap.bands[bi].p50RmsDb + snap.bands[bi].p95RmsDb) * 0.5f;
-
-        // ── EQ ────────────────────────────────────────────────────────────────
-        float eqGain = std::clamp(preset.bandRmsDb[bi] - refDb, -12.f, 12.f);
-        if (std::abs(eqGain) < 0.5f) eqGain = 0.f;
-
-        const float absGain = std::abs(eqGain);
-        float q = absGain < 3.f ? 0.7f
-                : absGain < 6.f ? 1.0f
-                : absGain < 9.f ? 1.4f : 2.0f;
-
-        out.eq[bi].gainDb  = eqGain;
-        out.eq[bi].q       = q;
-        out.eq[bi].isShelf = AnalysisSnapshot::kBandIsShelf[bi];
-        out.eq[bi].freqHz  = AnalysisSnapshot::kBandCenterHz[bi];
-
-        // ── Multiband compression ─────────────────────────────────────────────
-        const float excess = std::max(0.f, refDb - preset.bandRmsDb[bi]);
-        out.mbComp[bi].ratio     = std::clamp(1.f + excess * 0.25f, 1.1f, 8.f);
-        out.mbComp[bi].thresholdDb = preset.bandRmsDb[bi] - 3.f;
-
-        const float targetCrest  = preset.bandTransientDb[bi];
-        out.mbComp[bi].attackMs  = targetCrest > 16.f ? 20.f
-                                 : targetCrest > 12.f ? 10.f
-                                 : targetCrest > 8.f  ?  5.f : 2.f;
-        out.mbComp[bi].releaseMs = kRelMs[i];
-
-        // ── Stereo width ──────────────────────────────────────────────────────
-        const float corr      = snap.bands[bi].correlation;
-        const float minCorr   = preset.bandMinCorr[bi];
-        // Width = 1 when correlation is exactly at the floor (no change).
-        // If correlation > floor: room to widen (width > 1, up to ~1.3).
-        // If correlation < floor: pull in (width < 1, down to 0.7).
-        const float corrDelta = corr - minCorr;
-        out.width[bi].width = std::clamp(1.f + corrDelta * 0.5f, 0.7f, 1.3f);
-    }
-
-    // ── Mixbus compression ────────────────────────────────────────────────────
-    const float overallDb  = (snap.overallAvgDb + snap.overallPeakDb) * 0.5f;
-    const float overallExcess = std::max(0.f, overallDb - preset.overallRmsDb);
-
-    out.mixbusComp.ratio       = std::clamp(2.f + overallExcess * 0.15f, 1.5f, 6.f);
-    out.mixbusComp.thresholdDb = preset.overallRmsDb - 6.f;
-    out.mixbusComp.attackMs    = 15.f;
-    out.mixbusComp.releaseMs   = std::clamp(100.f + overallExcess * 5.f, 80.f, 300.f);
-    // Expected GR → makeup compensates
-    const float expGR = std::max(0.f, overallDb - out.mixbusComp.thresholdDb)
-                        * (1.f - 1.f / out.mixbusComp.ratio);
-    out.mixbusComp.makeupDb = std::clamp(expGR + std::max(0.f, preset.overallRmsDb - overallDb),
-                                          0.f, 18.f);
-
-    // ── Saturator drive ───────────────────────────────────────────────────────
-    // Drive = average crest deficit across bands, clamped to [0, 6 dB].
-    float crestDeficit = 0.f;
-    for (size_t i = 0; i < static_cast<size_t>(AdviceSet::kNumBands); ++i)
-        crestDeficit += snap.bands[i].crestDb - preset.bandTransientDb[i];
-    crestDeficit /= static_cast<float>(AdviceSet::kNumBands);
-    // Negative deficit = we need more transient / saturation
-    out.saturator.driveDb = std::clamp(-crestDeficit * 0.4f, 0.f, 6.f);
-
-    // ── Limiter target ────────────────────────────────────────────────────────
-    // Approximate LUFS from overallRmsDb (RMS dBFS ≈ LUFS − 3 dB heuristic).
-    // LRA offset: neutral at 12 LU; low LRA (hyperlimited) pulls down by up to 3 LU;
-    // high LRA (orchestral/film) raises by up to 3 LU — preserves macro-dynamics.
-    out.limiter.targetLufsApprox = preset.overallRmsDb + 3.f
-        + std::clamp((snap.lraLu - 12.f) * 0.30f, -3.f, 3.f);
-    out.limiter.ceilingDb        = -1.f;
-
-    return out;
+    const auto commonAdvice = ca::deriveAdvice(toCommonSnapshot(snap), toCommonPreset(preset));
+    return fromCommonAdvice(commonAdvice);
 }
 
 } // namespace mt
