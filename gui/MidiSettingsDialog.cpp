@@ -39,8 +39,8 @@ MidiSettingsDialog::MidiSettingsDialog(MidiController* midi, QWidget* parent)
     auto* hint = new QLabel(
         "nanoKONTROL2: select the port named \"nanoKONTROL2\".\n"
         "X-Touch Mini (GM Mode): select \"X-TOUCH MINI\".\n"
-        "Default mapping: faders 1\xe2\x80\x937 \xe2\x86\x92 EQ bands; "
-        "knobs 1\xe2\x80\x934 \xe2\x86\x92 Sat/MixbusThresh/MixbusMakeup/LimCeiling; "
+        "Default mapping: faders 1\xe2\x80\x93" "7 \xe2\x86\x92 EQ bands; "
+        "knobs 1\xe2\x80\x93" "4 \xe2\x86\x92 Sat/MixbusThresh/MixbusMakeup/LimCeiling; "
         "Play/Stop transport.",
         this);
     hint->setWordWrap(true);
