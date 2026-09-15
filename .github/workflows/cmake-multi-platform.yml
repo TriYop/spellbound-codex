@@ -43,9 +43,13 @@ jobs:
     - name: Install dependencies
       # libsqlite3-dev and pkg-config ship preinstalled on ubuntu-latest;
       # listed explicitly anyway so this step is the single source of truth.
+      # taglib's dev package was renamed libtag1-dev -> libtag-dev across
+      # Ubuntu releases (both ship the same "taglib" pkg-config module) --
+      # try both so this doesn't break again on the next runner image bump.
       run: |
         sudo apt-get update
-        sudo apt-get install -y libsndfile1-dev libtag-dev qt6-base-dev pkg-config libsqlite3-dev
+        sudo apt-get install -y libsndfile1-dev qt6-base-dev pkg-config libsqlite3-dev
+        sudo apt-get install -y libtag-dev || sudo apt-get install -y libtag1-dev
 
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
