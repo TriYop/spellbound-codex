@@ -20,7 +20,7 @@ MasterTweak is **independent of MixAdvice as a codebase** — no shared code, no
 
 ```bash
 sudo apt install cmake ninja-build build-essential git curl \
-    libsndfile1-dev qt6-base-dev
+    libsndfile1-dev libtag-dev libsqlite3-dev qt6-base-dev pkg-config libasound2-dev
 ```
 
 ### Configure / build
