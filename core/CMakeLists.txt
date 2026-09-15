@@ -30,7 +30,7 @@ target_include_directories(mastertweak_core PUBLIC
 
 target_link_libraries(mastertweak_core
     PUBLIC
-        PkgConfig::SNDFILE
+        $<IF:$<BOOL:${MASTERTWEAK_STATIC}>,SndFile::sndfile,PkgConfig::SNDFILE>
     PRIVATE
         pugixml
 )

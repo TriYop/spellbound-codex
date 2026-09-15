@@ -6,3 +6,7 @@ target_link_libraries(mastertweak-backfill-analysis
         preset_builder_core
         cli11
 )
+
+if(MASTERTWEAK_STATIC)
+    target_link_options(mastertweak-backfill-analysis PRIVATE -static)
+endif()
