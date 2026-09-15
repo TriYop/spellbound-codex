@@ -122,3 +122,61 @@ TEST_CASE("limiter ceiling is -1 dBTP") {
     const auto advice = mt::deriveAdvice(makeOnTargetSnapshot(makeTestPreset()), makeTestPreset());
     CHECK(advice.limiter.ceilingDb == doctest::Approx(-1.f));
 }
+
+// Regression guard for core/src/advice.cpp's fromCommonAdvice() field-by-field mapping.
+// Every input below is a distinct value so a transposition anywhere in that ~30-field
+// mapping (e.g. swapping attackMs/releaseMs, or ratio/makeupDb) would change one of
+// these asserted values -- fields not already exercised by the test cases above
+// (eq[i].q/freqHz, mbComp[i].thresholdDb/attackMs/releaseMs, width[i].width,
+// mixbusComp.ratio/attackMs/releaseMs/makeupDb, saturator.driveDb).
+// Expected values hand-derived from AudioPluginsCommon::analysis::deriveAdvice's
+// formula (Common/src/analysis/AdviceSet.cpp), band index 3 ("Mids").
+TEST_CASE("deriveAdvice: field-by-field regression guard against mapping transpositions") {
+    mt::PresetData preset;
+    preset.name = "Regression";
+    preset.bandRmsDb[3]       = -18.f;
+    preset.bandMinCorr[3]     =   0.5f;
+    preset.bandTransientDb[3] =   9.f;
+    preset.overallRmsDb   = -14.f;
+    preset.overallMinCorr =   0.55f;
+
+    mt::AnalysisSnapshot snap;
+    snap.bands[3].p50RmsDb    = -10.f;
+    snap.bands[3].p95RmsDb    =  -6.f;
+    snap.bands[3].correlation =   0.9f;
+    snap.bands[3].crestDb     =   5.f;
+    snap.overallAvgDb  = -10.f;
+    snap.overallPeakDb =  -6.f;
+
+    const auto advice = mt::deriveAdvice(snap, preset);
+
+    // Band 3 EQ: refDb = (p50 + p95)/2 = -8; gain = clamp(bandRmsDb - refDb) = -10 dB;
+    // |gain|=10 >= 9 -> q = 2.0; freqHz = BandConfig::bandCenterHz[Mids] = 1000 Hz.
+    CHECK(advice.eq[3].gainDb == doctest::Approx(-10.f));
+    CHECK(advice.eq[3].q      == doctest::Approx(2.f));
+    CHECK(advice.eq[3].freqHz == doctest::Approx(1000.f));
+
+    // Band 3 multiband comp: excess = refDb - bandRmsDb = 10; threshold = bandRmsDb - 3;
+    // targetCrest = bandTransientDb = 9 -> attack bracket "9 > 8" = 5 ms;
+    // releaseMs = per-band release table[3] = 100 ms.
+    CHECK(advice.mbComp[3].thresholdDb == doctest::Approx(-21.f));
+    CHECK(advice.mbComp[3].attackMs    == doctest::Approx(5.f));
+    CHECK(advice.mbComp[3].releaseMs   == doctest::Approx(100.f));
+
+    // Band 3 width: corrDelta = correlation - bandMinCorr = 0.4; width = clamp(1 + 0.4*0.5) = 1.2
+    CHECK(advice.width[3].width == doctest::Approx(1.2f));
+
+    // Mixbus comp: overallDb = (overallAvgDb + overallPeakDb)/2 = -8;
+    // overallExcess = overallDb - overallRmsDb = 6.
+    CHECK(advice.mixbusComp.ratio     == doctest::Approx(2.9f));
+    CHECK(advice.mixbusComp.attackMs  == doctest::Approx(15.f));
+    CHECK(advice.mixbusComp.releaseMs == doctest::Approx(130.f));
+    // makeupDb = clamp(max(0, overallDb - threshold) * (1 - 1/ratio) + max(0, overallRmsDb - overallDb), 0, 18)
+    //          = clamp(12 * (1 - 1/2.9) + 0, 0, 18) ≈ 7.862069
+    CHECK(advice.mixbusComp.makeupDb == doctest::Approx(7.862069f).epsilon(0.001));
+
+    // Saturator: crestDeficit = avg over 7 bands of (crestDb - bandTransientDb);
+    // only band 3 is non-zero here: (5 - 9)/7 = -0.571429;
+    // driveDb = clamp(-crestDeficit * 0.4, 0, 6) ≈ 0.228571
+    CHECK(advice.saturator.driveDb == doctest::Approx(0.228571f).epsilon(0.001));
+}

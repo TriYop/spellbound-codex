@@ -9,8 +9,6 @@ add_library(mastertweak_core STATIC
     src/codec_correction.cpp
     src/report.cpp
     src/resonance_detector.cpp
-    src/dsp/fft.cpp
-    src/dsp/linkwitz_riley.cpp
     src/dsp/parametric_eq.cpp
     src/dsp/compressor.cpp
     src/dsp/multiband_comp.cpp
@@ -19,7 +17,6 @@ add_library(mastertweak_core STATIC
     src/dsp/stereo_width.cpp
     src/dsp/limiter.cpp
     src/dsp/dither.cpp
-    src/dsp/lufs_analyser.cpp
     src/dsp/gain_stager.cpp
     src/dsp/resonance_eq.cpp
 )
@@ -31,8 +28,8 @@ target_include_directories(mastertweak_core PUBLIC
 target_link_libraries(mastertweak_core
     PUBLIC
         $<IF:$<BOOL:${MASTERTWEAK_STATIC}>,SndFile::sndfile,PkgConfig::SNDFILE>
-    PRIVATE
-        pugixml
+        AudioPluginsCommon::dsp
+        AudioPluginsCommon::analysis
 )
 
 target_compile_definitions(mastertweak_core PUBLIC

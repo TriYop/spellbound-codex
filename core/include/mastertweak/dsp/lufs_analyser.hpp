@@ -1,51 +1,35 @@
 #pragma once
 
-#include "mastertweak/dsp/biquad.hpp"
+#include "audioplugins/common/analysis/LoudnessAnalyser.h"
 
 #include <vector>
 
 namespace mt::dsp {
 
-struct LoudnessMetrics {
-    float integratedLufs = -70.f;  // EBU R128 integrated loudness (LUFS)
-    float lra            =   0.f;  // EBU R128 Loudness Range (LU); 0 = silence/unknown
-};
+using LoudnessMetrics = audioplugins::common::analysis::LoudnessMetrics;
 
-// EBU R128 integrated loudness measurement (ITU-R BS.1770-4).
-// K-weighting: Stage 1 high-shelf (1682 Hz, +4 dB) + Stage 2 high-pass (38 Hz).
-// 400 ms blocks, 75% overlap, absolute gate -70 LUFS, relative gate -10 LU.
-// Returns: L = -0.691 + 10*log10(gated_mean_power).
-// Returns -70.f when no blocks survive gating (silence or sub-block buffers).
+// Thin wrapper: forwards to AudioPluginsCommon::analysis::LoudnessAnalyser,
+// which is itself ported from this file's original K-weighting/gating math
+// (see Common's design spec). Kept as a distinct mt::dsp class -- rather
+// than a bare alias -- only because this class historically took a float
+// sampleRate in prepare() while Common's takes double; the wrapper absorbs
+// that conversion so no call site needs to change.
 class LufsAnalyser {
 public:
-    void prepare(float sampleRate, int numChannels);
+    void prepare(float sampleRate, int numChannels) {
+        impl_.prepare(static_cast<double>(sampleRate), numChannels);
+    }
 
-    // Measure integrated LUFS of the full buffer [numChannels × numFrames].
-    float measure(const std::vector<std::vector<float>>& samples, int numFrames);
+    float measure(const std::vector<std::vector<float>>& samples, int numFrames) {
+        return impl_.measure(samples, numFrames);
+    }
 
-    // Measure integrated LUFS (400 ms blocks, -10 LU gate) and LRA
-    // (3 s blocks, -20 LU gate, P95-P10) in one K-weighting pass.
-    LoudnessMetrics measureWithLra(const std::vector<std::vector<float>>& samples,
-                                   int numFrames);
+    LoudnessMetrics measureWithLra(const std::vector<std::vector<float>>& samples, int numFrames) {
+        return impl_.measureWithLra(samples, numFrames);
+    }
 
 private:
-    static BiquadCoeffs kWeightingStage1(double sr);
-    static BiquadCoeffs kWeightingStage2(double sr);
-
-    // Shared computation helpers
-    std::vector<std::vector<float>> kWeightBuffer(
-        const std::vector<std::vector<float>>& samples, int numFrames) const;
-    std::vector<double> blockPowers(
-        const std::vector<std::vector<float>>& kw,
-        int numFrames, int windowSamples) const;
-    float integratedLufsFromBlocks(const std::vector<double>& blocks) const;
-
-    float sampleRate_  = 48000.f;
-    int   numChannels_ = 2;
-    int   blockSize_   = 0;   // 400 ms in samples
-    int   hopSize_     = 0;   // 100 ms in samples (75% overlap)
-    BiquadCoeffs stage1_{};
-    BiquadCoeffs stage2_{};
+    audioplugins::common::analysis::LoudnessAnalyser impl_;
 };
 
 } // namespace mt::dsp
