@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 project(MasterTweak
     VERSION 0.1.0
-    DESCRIPTION "Offline auto-mastering app driven by MixAdvice profile presets"
+    DESCRIPTION "Spellbound Codex — The Mastering Grimoire"
     LANGUAGES CXX
 )
 
