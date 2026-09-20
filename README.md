@@ -1,4 +1,6 @@
-# MasterTweak
+# Spellbound Codex
+
+*"The Mastering Grimoire"*
 
 Offline auto-mastering application for audio engineers. Analyses a track against a genre preset, derives a full mastering chain, and renders the result — all without a DAW.
 
